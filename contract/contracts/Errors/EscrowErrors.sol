@@ -20,3 +20,8 @@ error Escrow__UnauthorizedAccess();
 error Escrow__NotEnoughApprovals();
 error Escrow__SponsorNameCannotBeEmpty();
 error Escrow__SponsorAlreadyWhitelisted();
+error Escrow__SponsorNotWhitelisted();
+error Escrow_AlreadyFunded();
+error Escrow_InsufficientAllowance();
+error Escrow_InvalidTokenTransfer();
+error Escrow_InvalidEthAmount();

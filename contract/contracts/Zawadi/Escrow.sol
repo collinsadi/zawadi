@@ -47,7 +47,10 @@ contract Escrow {
         _;
     }
 
-
+    modifier sponsorWhitelisted(address _sponsor) {
+        if (!sponsors[_sponsor]) revert Escrow__SponsorNotWhitelisted();
+        _;
+    }
 
     //constructor
 
@@ -58,10 +61,7 @@ contract Escrow {
         challengeCount = 0;
     }
 
-
-
     //functions
-
 
     /**
      * @notice Allows the organizer to whitelist a sponsor to add challenges
@@ -75,7 +75,6 @@ contract Escrow {
         emit SponsorWhitelisted(_sponsor);
     }
 
-
     /**
      * @notice Allows the sponsor to add a new challenge to the escrow
      * @param _totalPrize The total prize for the challenge
@@ -83,8 +82,12 @@ contract Escrow {
      * @param _isERC20 Whether the token is an ERC20 token
      * @param _ipfsCid The IPFS CID for the challenge
      */
-    function addChallenge(uint256 _totalPrize, address _token, bool _isERC20, string memory _ipfsCid) external beforeLock {
-
+    function addChallenge(
+        uint256 _totalPrize,
+        address _token,
+        bool _isERC20,
+        string memory _ipfsCid
+    ) external beforeLock sponsorWhitelisted(msg.sender) {
         //check if total prize is greater than 0
         if (_totalPrize == 0) revert Escrow__InvalidTokenOrPrize();
 
@@ -104,5 +107,56 @@ contract Escrow {
 
         //emit the challenge added event
         emit ChallengeAdded(challengeId, msg.sender, _totalPrize, _ipfsCid);
+    }
+
+    /**
+     * @notice Allows the sponsor to fund the challenge
+     * @param _challengeId The id of the challenge to fund
+     */
+    function fundChallenge(
+        uint256 _challengeId
+    )
+        external
+        payable
+        onlySponsor(_challengeId)
+        beforeLock
+        challengeExists(_challengeId)
+    {
+        EscrowLib.Challenge storage challenge = challenges[_challengeId];
+
+        if (challenge.isFunded) {
+            revert Escrow_AlreadyFunded();
+        }
+
+        if (challenge.isERC20) {
+            // ERC20 funding
+            IERC20 token = IERC20(challenge.token);
+
+            // Ensure sponsor approved enough tokens
+            uint256 allowance = token.allowance(msg.sender, address(this));
+            if (allowance < challenge.totalPrize) {
+                revert Escrow_InsufficientAllowance();
+            }
+
+            // Transfer tokens to escrow
+            bool success = token.transferFrom(
+                msg.sender,
+                address(this),
+                challenge.totalPrize
+            );
+            if (!success) {
+                revert Escrow_InvalidTokenTransfer();
+            }
+        } else {
+            // Native ETH funding
+            if (msg.value != challenge.totalPrize) {
+                revert Escrow_InvalidEthAmount();
+            }
+        }
+
+        // Mark funded
+        challenge.isFunded = true;
+
+        emit ChallengeFunded(_challengeId, msg.sender, challenge.totalPrize);
     }
 }
