@@ -179,7 +179,7 @@ contract Escrow {
         uint256 _challengeId,
         address[] calldata _winners,
         uint256[] calldata _allocations
-    ) external beforeLock challengeExists(_challengeId) {
+    ) external beforeLock challengeExists(_challengeId) onlyOrganizer {
         EscrowLib.Challenge storage challenge = challenges[_challengeId];
 
         if (!challenge.isFunded) {
@@ -216,5 +216,33 @@ contract Escrow {
         }
 
         emit WinnersAdded(_challengeId, _winners, _allocations);
+    }
+
+    /**
+     * @notice Approves the distribution of funds for a challenge
+     * @param _challengeId The id of the challenge
+     */
+    function approveDistribution(
+        uint256 _challengeId
+    ) external beforeLock challengeExists(_challengeId) {
+        EscrowLib.Challenge storage challenge = challenges[_challengeId];
+        EscrowLib.Approval storage approval = approvals[_challengeId];
+
+        // Only organiser or sponsor can approve
+        if (msg.sender != challenge.sponsor && msg.sender != organizer) {
+            revert Escrow__UnauthorizedAccess();
+        }
+
+        if (msg.sender == challenge.sponsor) {
+            if (approval.sponsorApproved)
+                revert Escrow__SponsorAlreadyApproved();
+            approval.sponsorApproved = true;
+            emit DistributionApproved(_challengeId, msg.sender);
+        } else if (msg.sender == organizer) {
+            if (approval.organiserApproved)
+                revert Escrow__OrganizerAlreadyApproved();
+            approval.organiserApproved = true;
+            emit DistributionApproved(_challengeId, msg.sender);
+        }
     }
 }
