@@ -19,3 +19,4 @@ error Escrow__SponsorAlreadyApproved();
 error Escrow__UnauthorizedAccess();
 error Escrow__NotEnoughApprovals();
 error Escrow__SponsorNameCannotBeEmpty();
+error Escrow__SponsorAlreadyWhitelisted();
