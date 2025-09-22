@@ -25,3 +25,5 @@ error Escrow_AlreadyFunded();
 error Escrow_InsufficientAllowance();
 error Escrow_InvalidTokenTransfer();
 error Escrow_InvalidEthAmount();
+error Escrow_ChallengeNotFunded();
+error Escrow_InvalidAllocation();

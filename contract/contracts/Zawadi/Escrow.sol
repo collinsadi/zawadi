@@ -159,4 +159,62 @@ contract Escrow {
 
         emit ChallengeFunded(_challengeId, msg.sender, challenge.totalPrize);
     }
+
+    /**
+     * @notice Allows the organizer to lock the contract
+     *
+     */
+    function lockContract() external beforeLock onlyOrganizer {
+        isLocked = true;
+        emit ConfigurationLocked();
+    }
+
+    /**
+     * @notice Allows the organiser to add winners and their allocations
+     * @param _challengeId The id of the challenge
+     * @param _winners The list of winners' addresses (ordered by position)
+     * @param _allocations The corresponding prize allocations for each winner
+     */
+    function addWinners(
+        uint256 _challengeId,
+        address[] calldata _winners,
+        uint256[] calldata _allocations
+    ) external beforeLock challengeExists(_challengeId) {
+        EscrowLib.Challenge storage challenge = challenges[_challengeId];
+
+        if (!challenge.isFunded) {
+            revert Escrow_ChallengeNotFunded();
+        }
+
+        if (_winners.length == 0 || _winners.length != _allocations.length) {
+            revert Escrow_InvalidAllocation();
+        }
+
+        uint256 totalAllocated = 0;
+
+        for (uint256 i = 0; i < _winners.length; i++) {
+            address winner = _winners[i];
+            uint256 amount = _allocations[i];
+
+            if (winner == address(0) || amount == 0) {
+                revert Escrow_InvalidAllocation();
+            }
+
+            allocations[winner] = EscrowLib.Allocation({
+                position: i + 1, // 1-based index
+                amount: amount,
+                winner: winner,
+                claimed: false,
+                challenge: _challengeId
+            });
+
+            totalAllocated += amount;
+        }
+
+        if (totalAllocated != challenge.totalPrize) {
+            revert Escrow_InvalidAllocation();
+        }
+
+        emit WinnersAdded(_challengeId, _winners, _allocations);
+    }
 }

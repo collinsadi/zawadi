@@ -18,6 +18,7 @@ library EscrowLib {
         uint256 amount;
         address winner;
         bool claimed;
+        uint256 challenge;
     }
 
     struct Approval {
