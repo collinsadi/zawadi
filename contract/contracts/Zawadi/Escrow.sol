@@ -245,4 +245,13 @@ contract Escrow {
             emit DistributionApproved(_challengeId, msg.sender);
         }
     }
+
+    /**
+     * @notice Allows the organizer to unlock the contract
+     *
+     */
+    function unLockContract() external onlyOrganizer {
+        isLocked = false;
+        emit ConfigurationUnLocked();
+    }
 }

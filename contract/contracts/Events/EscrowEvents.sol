@@ -8,4 +8,5 @@ event WinnersAdded(uint256 indexed challengeId, address[] winners, uint256[] all
 event DistributionApproved(uint256 indexed challengeId, address approver);
 event PrizeClaimed(uint256 indexed challengeId, address winner, uint256 amount);
 event ConfigurationLocked();
+event ConfigurationUnLocked();
 event SponsorWhitelisted(address sponsor);
