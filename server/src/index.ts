@@ -9,6 +9,7 @@ import dotenv from "dotenv";
 import { authRoutes } from "./modules/Auth";
 import swaggerUi from "swagger-ui-express";
 import { specs } from "./common/config/swagger";
+import { startFactoryEventListener } from "./common/services/blockchainService";
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
@@ -100,6 +101,9 @@ httpServer.listen(ENVIRONMENT.APP.PORT, async () => {
     // Connect to database
     await connectDb();
     console.log("✅ Database connected successfully");
+
+    // Start blockchain event listener
+    startFactoryEventListener();
   } catch (error) {
     console.error("❌ Failed to initialize services:", error);
     process.exit(1);

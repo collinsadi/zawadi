@@ -20,6 +20,7 @@ export const ENVIRONMENT = {
   },
   BLOCKCHAIN: {
     RPC_URL: process.env.RPC_URL ?? 'http://localhost:8545',
+    WS_URL: process.env.WS_URL ?? 'ws://localhost:8545',
     CHAIN_ID: process.env.CHAIN_ID ? parseInt(process.env.CHAIN_ID) : 31337,
     CONTRACT_ADDRESS: process.env.CONTRACT_ADDRESS ?? '',
   },
