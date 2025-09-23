@@ -10,6 +10,7 @@ import { authRoutes } from "./modules/Auth";
 import swaggerUi from "swagger-ui-express";
 import { specs } from "./common/config/swagger";
 import { startFactoryEventListener } from "./common/services/blockchainService";
+import { hackathonRouter } from "./modules/Hackathon/routes"
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
@@ -46,6 +47,7 @@ app.use(express.static("./src/common/public"));
 
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/hackathons", hackathonRouter);
 
 // API Documentation
 app.use(

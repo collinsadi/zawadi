@@ -23,6 +23,7 @@ const HackathonSchema = new Schema<IHackathon>(
       type: String,
       required: true,
       trim: true,
+      index: true,
     },
     identifier: {
       type: String,

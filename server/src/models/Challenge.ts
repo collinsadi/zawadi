@@ -29,6 +29,7 @@ const ChallengeSchema = new Schema<IChallenge>(
       type: String,
       required: true,
       trim: true,
+      index: true,
     },
     ipfsCid: {
       type: String,

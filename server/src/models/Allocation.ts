@@ -29,6 +29,7 @@ const AllocationSchema = new Schema<IAllocation>(
       type: String,
       required: true,
       trim: true,
+      index: true,
     },
     claimed: {
       type: Boolean,
