@@ -161,6 +161,23 @@ contract Escrow {
     }
 
     /**
+     * @notice Returns the challenge data for a given id
+     * @param _challengeId The id of the challenge
+     * @return challenge The challenge struct
+     */
+    function getChallenge(
+        uint256 _challengeId
+    )
+        external
+        view
+        challengeExists(_challengeId)
+        returns (EscrowLib.Challenge memory challenge)
+    {
+        challenge = challenges[_challengeId];
+        return challenge;
+    }
+
+    /**
      * @notice Allows the organizer to lock the contract
      *
      */
