@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import {Factory} from "../../contracts/Zawadi/Factory.sol";
-import {FactoryLib} from "../../contracts/Libraries/FactoryLib.sol";
+import {Factory} from "../contracts/Zawadi/Factory.sol";
+import {FactoryLib} from "../contracts/Libraries/FactoryLib.sol";
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 
