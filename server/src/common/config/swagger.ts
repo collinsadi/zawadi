@@ -44,118 +44,6 @@ const options = {
             },
           },
         },
-        Mission: {
-          type: 'object',
-          properties: {
-            _id: {
-              type: 'string',
-              example: '507f1f77bcf86cd799439011',
-            },
-            missionTitle: {
-              type: 'string',
-              example: 'Mars Colony Mission',
-            },
-            missionType: {
-              type: 'string',
-              example: 'exploration',
-            },
-            organisation: {
-              type: 'string',
-              example: 'NASA',
-            },
-            status: {
-              type: 'string',
-              enum: ['ended', 'active', 'pending', 'cancelled'],
-              example: 'active',
-            },
-          },
-        },
-        Stream: {
-          type: 'object',
-          properties: {
-            _id: {
-              type: 'string',
-              example: '507f1f77bcf86cd799439011',
-            },
-            mission: {
-              $ref: '#/components/schemas/Mission',
-            },
-            streamUrl: {
-              type: 'string',
-              example: 'https://example.com/video.mp4',
-            },
-            streamCount: {
-              type: 'number',
-              example: 150,
-            },
-            createdAt: {
-              type: 'string',
-              format: 'date-time',
-            },
-            updatedAt: {
-              type: 'string',
-              format: 'date-time',
-            },
-          },
-        },
-        Gallery: {
-          type: 'object',
-          properties: {
-            _id: {
-              type: 'string',
-              example: '507f1f77bcf86cd799439011',
-            },
-            mission: {
-              $ref: '#/components/schemas/Mission',
-            },
-            mediaUrls: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  type: {
-                    type: 'string',
-                    enum: ['image', 'video'],
-                    example: 'image',
-                  },
-                  url: {
-                    type: 'string',
-                    example: 'https://example.com/image.jpg',
-                  },
-                },
-              },
-            },
-            viewsCount: {
-              type: 'number',
-              example: 75,
-            },
-            createdAt: {
-              type: 'string',
-              format: 'date-time',
-            },
-            updatedAt: {
-              type: 'string',
-              format: 'date-time',
-            },
-          },
-        },
-        User: {
-          type: 'object',
-          properties: {
-            _id: {
-              type: 'string',
-              example: '507f1f77bcf86cd799439011',
-            },
-            email: {
-              type: 'string',
-              example: 'user@example.com',
-            },
-            username: {
-              type: 'string',
-              example: 'zawadi',
-            },
-          },
-        },
       },
     },
     security: [
@@ -166,10 +54,7 @@ const options = {
   },
   apis: [
     './src/modules/Auth/routes/*.ts',
-    './src/modules/Missions/routes/*.ts',
-    './src/modules/Streams/routes/*.ts',
-    './src/modules/Gallery/routes/*.ts',
-    './src/modules/NFT/routes/*.ts',
+    './src/modules/Hackathon/routes/*.ts',
   ],
 };
 

@@ -29,7 +29,7 @@ export async function getRelatedHackathonsController(
 
     const data = hacks.map((h) => {
       const relationships = h.relationships || [];
-      const relationship = relationships[0] || null; // primary role (organiser > sponsor > winner based on service order)
+      const relationship = relationships[0] || null;
       const { relationships: _r, ...doc } = h as any;
       return { ...doc, relationship, relationships };
     });
