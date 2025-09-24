@@ -1,6 +1,6 @@
 import { FiCalendar, FiMapPin, FiExternalLink, FiAward } from "react-icons/fi";
 import { Link } from "react-router-dom";
-import type { Hackathon } from "../types/Hackathon";
+import type { Hackathon } from "../../types/Hackathon";
 
 export default function HackathonCard({ hack }: { hack: Hackathon }) {
   return (
@@ -52,7 +52,7 @@ export default function HackathonCard({ hack }: { hack: Hackathon }) {
           <div className="flex items-center gap-2 justify-end">
             <FiAward className="text-primary-600" />
             <span>
-              {hack.details.currency + " "} 
+              {hack.details.currency + " "}
               {new Intl.NumberFormat(undefined, {
                 currency: hack.details.currency,
               }).format(Number(hack.details.prizePool))}
@@ -60,7 +60,9 @@ export default function HackathonCard({ hack }: { hack: Hackathon }) {
           </div>
           <div className="flex items-center gap-2">
             <FiMapPin className="text-primary-600" />
-            <span>{hack.details.location}</span>
+            <span>
+              {hack.type === "In-person" ? hack.details.location : "Online"}
+            </span>
           </div>
         </div>
 

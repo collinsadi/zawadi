@@ -1,5 +1,5 @@
 import Navbar from "../components/Navbar";
-import HackathonCard from "../components/HackathonCard";
+import HackathonCard from "../components/Hackathon/HackathonCard";
 import type { Hackathon } from "../types/Hackathon";
 import { hackathons } from "../data/hackathons";
 import { FiFilter } from "react-icons/fi";
@@ -33,11 +33,7 @@ export default function HomePage() {
             {[
               "All",
               "Online",
-              "In-person",
-              "DeFi",
-              "ZK",
-              "AI",
-              "Public Goods",
+              "In-person"
             ].map((chip) => (
               <button
                 key={chip}
