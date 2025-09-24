@@ -1,9 +1,12 @@
-import mongoose, { Document, Schema } from 'mongoose';
+import mongoose, { Document, Schema } from "mongoose";
 
 export interface IUser extends Document {
   walletAddress: string;
-  createdAt: Date;
-  updatedAt: Date;
+  profile: {
+    displayName?: string;
+    avatar?: string;
+  };
+  ensName?: string;
 }
 
 const UserSchema = new Schema<IUser>(
@@ -14,11 +17,25 @@ const UserSchema = new Schema<IUser>(
       unique: true,
       trim: true,
     },
+
+    profile: {
+      displayName: {
+        type: String,
+        trim: true,
+      },
+      avatar: {
+        type: String,
+        default: "",
+      },
+    },
+    ensName: {
+      type: String,
+      default: "",
+    },
   },
   {
-    timestamps: true, 
+    timestamps: true,
   }
 );
 
-
-export const User = mongoose.model<IUser>('User', UserSchema);
+export const User = mongoose.model<IUser>("User", UserSchema);
