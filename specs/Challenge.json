@@ -1,0 +1,15 @@
+{
+  "id": "string",
+  "totalPrize": "string",
+  "token": "string",
+  "isErc20": "boolean",
+  "data": {
+    "image": "string",
+    "details": "string"
+  },
+  "sponsor": {
+    "link": "string",
+    "name": "string",
+    "logo": "string"
+  }
+}

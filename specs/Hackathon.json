@@ -1,20 +1,20 @@
 {
-    "id": "string",
-    "title": "string",
-    "cover":"string",
-    "description":"string",
-    "details":{
-        "prizePool":"string",
-        "currency":"string",
-        "startDate":"string",
-        "endDate":"string",
-        "location":"string",
-        "tags":["string"]
-    },
-    "organiser":{
-        "name":"string",
-        "logo":"string",
-        "url":"string"
-    },
-    "type" : "string"
+  "id": "string",
+  "title": "string",
+  "cover": "string",
+  "description": "string",
+  "details": {
+    "prizePool": "string",
+    "currency": "string",
+    "startDate": "string",
+    "endDate": "string",
+    "location": "string",
+    "tags": ["string"]
+  },
+  "organiser": {
+    "name": "string",
+    "logo": "string",
+    "url": "string"
+  },
+  "type": "string"
 }
