@@ -41,7 +41,7 @@ export default function HackathonDetails() {
       },
       details: {
         prizePool: "500,000",
-        currency: "ETB",
+        currency: "USD",
         startDate: new Date().toISOString(),
         endDate: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
         location: "Addis Ababa, Ethiopia",
@@ -128,19 +128,21 @@ export default function HackathonDetails() {
               <div className="flex items-start gap-2">
                 <span className="mt-1 h-2 w-2 rounded-full bg-slate-400" />
                 <div>
-                  <div className="font-medium">Deadline</div>
-                  <div className="text-slate-500">
-                    {fmtDate(hackathon.details.endDate)}
-                  </div>
+                  <div className="font-medium">Type</div>
+                  <div className="text-slate-500">{hackathon.type}</div>
                 </div>
               </div>
               <div className="flex items-start gap-2">
                 <span className="mt-1 h-2 w-2 rounded-full bg-slate-400" />
                 <div>
-                  <div className="font-medium">Location</div>
-                  <div className="text-slate-500">
-                    {hackathon.details.location}
-                  </div>
+                  {hackathon.type === "In-person" && (
+                    <>
+                      <div className="font-medium">Location</div>
+                      <div className="text-slate-500">
+                        {hackathon.details.location}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
               <div>
@@ -181,7 +183,7 @@ export default function HackathonDetails() {
 
             <div className="mt-5 flex gap-3">
               <button className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-700">
-                Manage Submission
+                Manage
               </button>
             </div>
           </aside>
