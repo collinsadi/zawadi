@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import Home from "../pages/Home";
-import CreateHackathon from "../pages/CreateHackathon";
+import CreateHackathon from "../pages/Hackathon/CreateHackathon";
 
 const AppRoutes = () => {
   return (
