@@ -52,4 +52,23 @@ export class HackathonController {
       });
     }
   }
+
+  async getAllHackathons(_req: Request, res: Response) {
+    try {
+      const hacks = await this.hackathonService.getAllHackathons();
+      return res.json({
+        success: true,
+        message: "Hackathons retrieved successfully",
+        count: hacks.length,
+        data: hacks,
+      });
+    } catch (e) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to get hackathons",
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
 }
+

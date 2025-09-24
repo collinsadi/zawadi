@@ -107,7 +107,7 @@ httpServer.listen(ENVIRONMENT.APP.PORT, async () => {
     console.log("✅ Database connected successfully");
 
     // Start blockchain event listener
-    startFactoryEventListener();
+    // startFactoryEventListener();
   } catch (error) {
     console.error("❌ Failed to initialize services:", error);
     process.exit(1);

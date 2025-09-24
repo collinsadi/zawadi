@@ -110,4 +110,12 @@ export class HackathonService {
     // Return as array
     return Array.from(resultMap.values());
   }
+
+  /**
+   * Get all hackathons sorted by creation date descending
+   */
+  async getAllHackathons(): Promise<IHackathon[]> {
+    return Hackathon.find().sort({ createdAt: -1 }).lean();
+  }
 }
+
