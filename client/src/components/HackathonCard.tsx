@@ -52,8 +52,8 @@ export default function HackathonCard({ hack }: { hack: Hackathon }) {
           <div className="flex items-center gap-2 justify-end">
             <FiAward className="text-primary-600" />
             <span>
+              {hack.details.currency + " "} 
               {new Intl.NumberFormat(undefined, {
-                style: "currency",
                 currency: hack.details.currency,
               }).format(Number(hack.details.prizePool))}
             </span>

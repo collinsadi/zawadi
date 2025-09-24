@@ -1,9 +1,8 @@
-import Navbar from '../components/Navbar';
-import HackathonCard from '../components/HackathonCard';
-import type { Hackathon } from '../types/Hackathon';
-import { hackathons } from '../data/hackathons';
-import { FiFilter } from 'react-icons/fi';
-import { Link } from 'react-router-dom';
+import Navbar from "../components/Navbar";
+import HackathonCard from "../components/HackathonCard";
+import type { Hackathon } from "../types/Hackathon";
+import { hackathons } from "../data/hackathons";
+import { FiFilter } from "react-icons/fi";
 
 export default function HomePage() {
   return (
@@ -14,23 +13,36 @@ export default function HomePage() {
         <section className="mb-8">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Discover Hackathons</h1>
-              <p className="mt-2 text-slate-600 dark:text-slate-400">Compete, build, and earn prizes. Join top builders from around the world.</p>
+              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+                Discover Hackathons
+              </h1>
+              <p className="mt-2 text-slate-600 dark:text-slate-400">
+                Compete, build, and earn prizes. Join top builders from around
+                the world.
+              </p>
             </div>
 
             <div className="flex items-center gap-2">
               <button className="inline-flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800">
                 <FiFilter /> Filters
               </button>
-              <Link to="/hackathons/new" className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-700">
-                Create Hackathon
-              </Link>
             </div>
           </div>
 
           <div className="mt-6 flex flex-wrap gap-2">
-            {['All', 'Online', 'In-person', 'DeFi', 'ZK', 'AI', 'Public Goods'].map((chip) => (
-              <button key={chip} className="rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800">
+            {[
+              "All",
+              "Online",
+              "In-person",
+              "DeFi",
+              "ZK",
+              "AI",
+              "Public Goods",
+            ].map((chip) => (
+              <button
+                key={chip}
+                className="rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+              >
                 {chip}
               </button>
             ))}

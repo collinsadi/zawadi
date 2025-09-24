@@ -21,6 +21,7 @@ export const hackathons: Hackathon[] = [
       logo: "https://api.dicebear.com/9.x/shapes/svg?seed=zawadi",
       url: "https://zawadi.xyz",
     },
+    type: "Online",
   },
   {
     id: "ai-web3-builders",
@@ -42,6 +43,7 @@ export const hackathons: Hackathon[] = [
       logo: "https://api.dicebear.com/9.x/shapes/svg?seed=builders",
       url: "https://guild.example.com",
     },
+    type: "In-person",
   },
   {
     id: "l2-scaling-hack",
@@ -63,6 +65,7 @@ export const hackathons: Hackathon[] = [
       logo: "https://api.dicebear.com/9.x/shapes/svg?seed=l2",
       url: "https://l2alliance.example.com",
     },
+    type: "In-person",
   },
   {
     id: "open-source-impact-week",
@@ -84,5 +87,6 @@ export const hackathons: Hackathon[] = [
       logo: "https://api.dicebear.com/9.x/shapes/svg?seed=open",
       url: "https://open.builders.example.com",
     },
+    type: "Online",
   },
 ];

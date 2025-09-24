@@ -16,4 +16,5 @@ export type Hackathon = {
     logo: string;
     url: string;
   };
+  type: string;
 };
