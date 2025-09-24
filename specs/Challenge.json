@@ -1,5 +1,6 @@
 {
   "id": "string",
+  "title": "string",
   "totalPrize": "string",
   "token": "string",
   "isErc20": "boolean",

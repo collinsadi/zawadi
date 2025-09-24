@@ -5,12 +5,22 @@ import Navbar from "../../components/UI/Navbar";
 // Lightweight types mirroring Escrow.sol for UI purposes
 export type EscrowChallenge = {
   id: number;
+  title: string;
   totalPrize: string; // display-formatted for now
   token: string; // address or 'ETH'
   isERC20: boolean;
   ipfsCid: string;
   isFunded: boolean;
-  sponsor: string;
+  sponsor: string; // sponsor address (for permissions)
+  data: {
+    image: string;
+    details: string;
+  };
+  sponsorMeta: {
+    link: string;
+    name: string;
+    logo: string;
+  };
 };
 
 export type EscrowApproval = {
@@ -22,21 +32,41 @@ export type EscrowApproval = {
 const DEMO_CHALLENGES: EscrowChallenge[] = [
   {
     id: 0,
+    title: "Best DeFi Tooling",
     totalPrize: "200,000",
     token: "ETH",
     isERC20: false,
     ipfsCid: "bafy...abc",
     isFunded: true,
     sponsor: "0xSponsor...1234",
+    data: {
+      image: "https://images.unsplash.com/photo-1508385082359-f38ae991e8f2?w=1200&auto=format&fit=crop&q=60",
+      details: "Build tooling that improves developer UX for DeFi protocols. Markdown supported.",
+    },
+    sponsorMeta: {
+      link: "https://example.com",
+      name: "BAM",
+      logo: "https://res.cloudinary.com/demo/image/upload/w_120,h_120,c_thumb,g_face,r_max/flower.jpg",
+    },
   },
   {
     id: 1,
+    title: "AI + ZK Privacy",
     totalPrize: "300,000",
     token: "0xToken...ABCD",
     isERC20: true,
     ipfsCid: "bafy...xyz",
     isFunded: false,
     sponsor: "0xSponsor...5678",
+    data: {
+      image: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&auto=format&fit=crop&q=60",
+      details: "Demonstrate private inference using ZK proofs.",
+    },
+    sponsorMeta: {
+      link: "https://example.org",
+      name: "ACME Labs",
+      logo: "https://avatars.githubusercontent.com/u/9919?s=200&v=4",
+    },
   },
 ];
 
@@ -63,6 +93,7 @@ export default function ManageHackathon() {
   const [approvals, setApprovals] = useState<Record<number, EscrowApproval>>(initial.approvals || DEMO_APPROVALS);
 
   const fundedChallenges = useMemo(() => challenges.filter((c) => c.isFunded), [challenges]);
+  const [selected, setSelected] = useState<EscrowChallenge | null>(null);
 
   // Handlers (mock side-effects for now)
   const addSponsor = () => {
@@ -192,122 +223,88 @@ export default function ManageHackathon() {
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Challenges</h2>
               <div className="text-xs text-slate-500">{funded} funded / {total} total</div>
             </div>
-
-            {/* Table on md+, cards on small */}
-            <div className="mt-4 hidden md:block overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="text-left text-slate-500">
-                  <tr>
-                    <th className="py-2 pr-4">ID</th>
-                    <th className="py-2 pr-4">Sponsor</th>
-                    <th className="py-2 pr-4">Prize</th>
-                    <th className="py-2 pr-4">Token</th>
-                    <th className="py-2 pr-4">Funded</th>
-                    <th className="py-2 pr-4">Status</th>
-                    <th className="py-2 pr-4">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {challenges.map((c) => {
-                    const a = approvals[c.id];
-                    const needed = actionNeeded(c, a);
-                    return (
-                      <tr key={c.id} className="border-t border-slate-100 dark:border-slate-800">
-                        <td className="py-2 pr-4 font-medium text-slate-900 dark:text-slate-100">#{c.id}</td>
-                        <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">{c.sponsor}</td>
-                        <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">{c.totalPrize}</td>
-                        <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">{c.isERC20 ? c.token : "ETH"}</td>
-                        <td className="py-2 pr-4">
-                          <span className={
-                            "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium " +
-                            (c.isFunded ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700")
-                          }>
-                            {c.isFunded ? "Funded" : "Pending"}
-                          </span>
-                        </td>
-                        <td className="py-2 pr-4">
-                          {needed ? (
-                            <span className="inline-flex items-center rounded-full bg-primary-600/10 text-primary-700 dark:text-primary-300 px-2 py-0.5 text-xs font-medium">
-                              {needed}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-slate-500">OK</span>
-                          )}
-                        </td>
-                        <td className="py-2 pr-4">
-                          <div className="flex flex-wrap gap-2">
-                            {!c.isFunded && (
-                              <button className="rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-xs" onClick={() => alert("Sponsor fund flow (UI)")}>Fund</button>
-                            )}
-                            {c.isFunded && (
-                              <>
-                                <button className="rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-xs" onClick={() => addWinners(c.id)}>Add Winners</button>
-                                {!a?.organiserApproved && (
-                                  <button className="rounded-lg bg-primary-600 text-white px-2 py-1 text-xs" onClick={() => approveDistribution(c.id, "organiser")}>Approve (Org)</button>
-                                )}
-                                {!a?.sponsorApproved && (
-                                  <button className="rounded-lg bg-primary-600 text-white px-2 py-1 text-xs" onClick={() => approveDistribution(c.id, "sponsor")}>Approve (Sponsor)</button>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="md:hidden mt-4 grid grid-cols-1 gap-3">
+            {/* Card grid */}
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
               {challenges.map((c) => {
                 const a = approvals[c.id];
                 const needed = actionNeeded(c, a);
                 return (
-                  <div key={c.id} className="rounded-xl border border-slate-200 dark:border-slate-800 p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Challenge #{c.id}</div>
-                      <span className={
-                        "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium " +
-                        (c.isFunded ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700")
-                      }>
-                        {c.isFunded ? "Funded" : "Pending"}
-                      </span>
+                  <button
+                    key={c.id}
+                    onClick={() => setSelected(c)}
+                    className="group text-left overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition"
+                  >
+                    <div className="relative h-40 w-full overflow-hidden">
+                      <img src={c.data.image} alt={c.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                      <div className="absolute bottom-3 left-3 right-3">
+                        <h3 className="text-white font-semibold text-base line-clamp-1">{c.title}</h3>
+                      </div>
                     </div>
-                    <div className="mt-2 text-xs text-slate-600 dark:text-slate-300">Sponsor: {c.sponsor}</div>
-                    <div className="mt-1 text-xs text-slate-600 dark:text-slate-300 flex gap-4">
-                      <span>Prize: {c.totalPrize}</span>
-                      <span>Token: {c.isERC20 ? c.token : "ETH"}</span>
-                    </div>
-                    <div className="mt-2">
-                      {needed ? (
-                        <span className="inline-flex items-center rounded-full bg-primary-600/10 text-primary-700 dark:text-primary-300 px-2 py-0.5 text-[10px] font-medium">
-                          {needed}
+                    <div className="p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {c.sponsorMeta.logo && (
+                            <img src={c.sponsorMeta.logo} alt={c.sponsorMeta.name} className="h-6 w-6 rounded-full object-cover border border-white/20" />
+                          )}
+                          <div className="text-xs text-slate-600 dark:text-slate-300">{c.sponsorMeta.name}</div>
+                        </div>
+                        <span className={
+                          "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium " +
+                          (c.isFunded ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700")
+                        }>
+                          {c.isFunded ? "Funded" : "Pending"}
                         </span>
-                      ) : (
-                        <span className="text-[10px] text-slate-500">OK</span>
-                      )}
+                      </div>
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {!c.isFunded && (
-                        <button className="rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-xs" onClick={() => alert("Sponsor fund flow (UI)")}>Fund</button>
-                      )}
-                      {c.isFunded && (
-                        <>
-                          <button className="rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-xs" onClick={() => addWinners(c.id)}>Add Winners</button>
-                          {!a?.organiserApproved && (
-                            <button className="rounded-lg bg-primary-600 text-white px-2 py-1 text-xs" onClick={() => approveDistribution(c.id, "organiser")}>Approve (Org)</button>
-                          )}
-                          {!a?.sponsorApproved && (
-                            <button className="rounded-lg bg-primary-600 text-white px-2 py-1 text-xs" onClick={() => approveDistribution(c.id, "sponsor")}>Approve (Sponsor)</button>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
+
+            {/* Modal */}
+            {selected && (
+              <div className="fixed inset-0 z-50">
+                <div className="absolute inset-0 bg-black/50" onClick={() => setSelected(null)} />
+                <div className="absolute inset-0 p-4 sm:p-6 flex items-center justify-center">
+                  <div className="w-full max-w-lg rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl overflow-hidden">
+                    <div className="relative h-44 w-full">
+                      <img src={selected.data.image} alt={selected.title} className="h-full w-full object-cover" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                      <button className="absolute top-3 right-3 rounded-full bg-black/50 text-white w-7 h-7" onClick={() => setSelected(null)}>×</button>
+                    </div>
+                    <div className="p-4">
+                      <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{selected.title}</h3>
+                      <div className="mt-1 text-xs text-slate-500">Challenge #{selected.id} • Prize: {selected.totalPrize} • Token: {selected.isERC20 ? selected.token : 'ETH'}</div>
+                      <p className="mt-3 text-sm text-slate-700 dark:text-slate-300">{selected.data.details}</p>
+
+                      <div className="mt-4 flex items-center justify-between">
+                        <a href={selected.sponsorMeta.link} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-primary-700 dark:text-primary-300">
+                          {selected.sponsorMeta.logo && <img src={selected.sponsorMeta.logo} alt={selected.sponsorMeta.name} className="h-6 w-6 rounded-full object-cover" />}
+                          <span>{selected.sponsorMeta.name}</span>
+                        </a>
+                        <div className="flex items-center gap-2">
+                          {!selected.isFunded && (
+                            <button className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs" onClick={() => alert('Sponsor fund flow (UI)')}>Fund</button>
+                          )}
+                          {selected.isFunded && (
+                            <>
+                              <button className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs" onClick={() => addWinners(selected.id)}>Add Winners</button>
+                              {!approvals[selected.id]?.organiserApproved && (
+                                <button className="rounded-lg bg-primary-600 text-white px-3 py-1.5 text-xs" onClick={() => approveDistribution(selected.id, 'organiser')}>Approve (Org)</button>
+                              )}
+                              {!approvals[selected.id]?.sponsorApproved && (
+                                <button className="rounded-lg bg-primary-600 text-white px-3 py-1.5 text-xs" onClick={() => approveDistribution(selected.id, 'sponsor')}>Approve (Sponsor)</button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
         </div>
       </main>
