@@ -1,5 +1,5 @@
 import type { Address } from 'viem';
-import { readContract, simulateContract, waitForTransactionReceipt, writeContract } from 'wagmi/actions';
+import { readContract, simulateContract, waitForTransactionReceipt, writeContract, getPublicClient } from 'wagmi/actions';
 import { config } from '../config/wagmi';
 import escrowAbi from '../abi/escrow.json';
 
@@ -92,6 +92,23 @@ export function createEscrowService(address: Address) {
       functionName: 'allocations',
       args: [winner],
     }) as Promise<Allocation>;
+
+  // Logs-based enumeration of whitelisted sponsors
+  const listWhitelistedSponsors = async (): Promise<Address[]> => {
+    const publicClient = getPublicClient(config);
+    const logs = await publicClient.getLogs({
+      address: escrowAddress,
+      abi: escrowAbi as any,
+      eventName: 'SponsorWhitelisted',
+      fromBlock: 0n,
+    });
+    const addrs = logs
+      .map((l: any) => l?.args?.sponsor as Address)
+      .filter(Boolean);
+    // Unique, newest first
+    const unique = Array.from(new Set(addrs));
+    return unique.reverse();
+  };
 
   // Writes
   const whitelistSponsor = async (sponsorAddr: Address) => {
@@ -202,6 +219,7 @@ export function createEscrowService(address: Address) {
     sponsors,
     approvals,
     allocations,
+    listWhitelistedSponsors,
     // writes
     whitelistSponsor,
     addChallenge,

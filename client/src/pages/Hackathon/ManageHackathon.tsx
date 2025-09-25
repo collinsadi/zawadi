@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import Navbar from "../../components/UI/Navbar";
 import WhitelistPanel from "../../components/ManageHackathon/WhitelistPanel";
@@ -6,6 +6,10 @@ import ChallengesGrid from "../../components/ManageHackathon/ChallengesGrid";
 import ChallengeQuickViewModal from "../../components/ManageHackathon/ChallengeQuickViewModal";
 import WinnersModal from "../../components/ManageHackathon/WinnersModal";
 import type { EscrowChallenge, EscrowApproval } from "../../components/ManageHackathon/types";
+import { getHackathonById as getHackathonOnChain } from "../../services/factoryService";
+import { createEscrowService } from "../../services/escrowService";
+import ResultModal from "../../components/UI/ResultModal";
+import { isAddress } from "viem";
 
 // Demo data if none passed via navigation
 const DEMO_CHALLENGES: EscrowChallenge[] = [
@@ -59,13 +63,20 @@ export default function ManageHackathon() {
   const location = useLocation();
 
   const initial = (location.state as any) || {};
-  const [organiser] = useState<string>(initial.organiser || "0xOrganiser...9F2A");
+  const [organiser, setOrganiser] = useState<string>(initial.organiser || "");
+  const [escrowAddr, setEscrowAddr] = useState<string>(initial.escrow || "");
+  const [escrow, setEscrow] = useState<ReturnType<typeof createEscrowService> | null>(null);
+  const [loadingEscrow, setLoadingEscrow] = useState<boolean>(false);
 
   // Whitelist state (UI-only for now)
   const [whitelist, setWhitelist] = useState<string[]>(
-    initial.whitelist || ["0xSponsor...1234", "0xSponsor...5678"]
+    initial.whitelist || []
   );
   const [newSponsor, setNewSponsor] = useState("");
+  const [verifying, setVerifying] = useState<boolean>(false);
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [errorOpen, setErrorOpen] = useState(false);
+  const [modalMsg, setModalMsg] = useState<string>("");
 
   // Challenges and approvals (UI-only for now)
   const [challenges] = useState<EscrowChallenge[]>(initial.challenges || DEMO_CHALLENGES);
@@ -77,14 +88,83 @@ export default function ManageHackathon() {
   const [winnersRows, setWinnersRows] = useState<Array<{ address: string; amount: string }>>([]);
   const [winnersError, setWinnersError] = useState<string>("");
 
-  // Handlers (mock side-effects for now)
-  const addSponsor = () => {
+  // Load escrow address and organizer from factory by id
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      if (!id) return;
+      try {
+        setLoadingEscrow(true);
+        const onChain = await getHackathonOnChain(id as any);
+        if (cancelled) return;
+        setOrganiser(onChain.organizer as unknown as string);
+        const ea = onChain.escrowContract as unknown as string;
+        setEscrowAddr(ea);
+        setEscrow(createEscrowService(ea as any));
+      } catch (e) {
+        console.error("Failed to load escrow for manage page", e);
+        setModalMsg("Failed to load on-chain hackathon/escrow details.");
+        setErrorOpen(true);
+      } finally {
+        if (!cancelled) setLoadingEscrow(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [id]);
+
+  // Optionally verify pre-seeded addresses against on-chain mapping
+  useEffect(() => {
+    let cancelled = false;
+    async function verifyList() {
+      if (!escrow || whitelist.length === 0) return;
+      setVerifying(true);
+      try {
+        const results = await Promise.all(
+          whitelist.map(async (addr) => ({ addr, ok: await escrow.sponsors(addr as any).catch(() => false) }))
+        );
+        const onlyWhitelisted = results.filter(r => r.ok).map(r => r.addr);
+        if (!cancelled) setWhitelist(onlyWhitelisted);
+      } finally {
+        if (!cancelled) setVerifying(false);
+      }
+    }
+    verifyList();
+    return () => { cancelled = true; };
+  }, [escrow]);
+
+  // Handlers
+  const addSponsor = async () => {
     const addr = newSponsor.trim();
     if (!addr) return;
-    if (whitelist.includes(addr)) return;
-    setWhitelist((w) => [...w, addr]);
-    setNewSponsor("");
-    console.log("whitelistSponsor:", addr);
+    if (!isAddress(addr)) {
+      setModalMsg("Invalid address. Please enter a valid Ethereum address.");
+      setErrorOpen(true);
+      return;
+    }
+    if (!escrow) {
+      setModalMsg("Escrow not initialized yet. Try again in a moment.");
+      setErrorOpen(true);
+      return;
+    }
+    try {
+      // Skip if already whitelisted on-chain
+      const already = await escrow.sponsors(addr as any).catch(() => false);
+      if (already) {
+        setModalMsg("Address is already whitelisted.");
+        setErrorOpen(true);
+        return;
+      }
+      const { hash } = await escrow.whitelistSponsor(addr as any);
+      setWhitelist((w) => (w.includes(addr) ? w : [...w, addr]));
+      setNewSponsor("");
+      setModalMsg(`Sponsor whitelisted successfully. Tx: ${hash}`);
+      setSuccessOpen(true);
+    } catch (e: any) {
+      console.error(e);
+      setModalMsg(e?.shortMessage || e?.message || "Failed to whitelist sponsor.");
+      setErrorOpen(true);
+    }
   };
 
   const removeSponsor = (addr: string) => {
@@ -146,6 +226,9 @@ export default function ManageHackathon() {
             >
               View public page
             </Link>
+            {escrowAddr && (
+              <span className="text-[10px] text-slate-500">Escrow: {escrowAddr}</span>
+            )}
           </div>
         </div>
 
@@ -218,6 +301,27 @@ export default function ManageHackathon() {
             />
           )}
         </div>
+        {/* Feedback Modals */}
+        <ResultModal
+          open={successOpen}
+          title="Success"
+          message={modalMsg}
+          onClose={() => setSuccessOpen(false)}
+          variant="success"
+        />
+        <ResultModal
+          open={errorOpen}
+          title="Action Failed"
+          message={modalMsg}
+          onClose={() => setErrorOpen(false)}
+          variant="error"
+        />
+        {/* Misc state indicators (optional) */}
+        {(loadingEscrow || verifying) && (
+          <div className="mt-4 text-xs text-slate-500">
+            {loadingEscrow ? "Loading on-chain data..." : "Verifying whitelist..."}
+          </div>
+        )}
       </main>
     </div>
   );
