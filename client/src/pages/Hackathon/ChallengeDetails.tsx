@@ -10,7 +10,7 @@ import { simulateContract, writeContract, waitForTransactionReceipt } from "wagm
 import { parseAbiItem } from "viem";
 import { config } from "../../config/wagmi";
 import ResultModal from "../../components/UI/ResultModal";
-import type { Approval } from "../../services/escrowService";
+import type { Approval, Allocation } from "../../services/escrowService";
 
 export default function ChallengeDetails() {
   const { id, challengeId } = useParams();
@@ -29,6 +29,8 @@ export default function ChallengeDetails() {
   const [successOpen, setSuccessOpen] = useState(false);
   const [errorOpen, setErrorOpen] = useState(false);
   const [modalMsg, setModalMsg] = useState<string>("");
+  const [myAlloc, setMyAlloc] = useState<Allocation | null>(null);
+  const [claiming, setClaiming] = useState<boolean>(false);
 
   const mdTheme = useMemo<"light" | "dark">(() => {
     if (typeof document !== "undefined" && document.documentElement.classList.contains("dark")) return "dark";
@@ -90,6 +92,35 @@ export default function ChallengeDetails() {
   const approvalsRequired = 2;
   const approvalsRemaining = Math.max(0, approvalsRequired - approvalsCompleted);
   const approvalsRemainingDisplay = approvals ? String(approvalsRemaining) : "—";
+  const approvalsBoth = !!approvals?.organiserApproved && !!approvals?.sponsorApproved;
+
+  // Determine if connected user is a winner and claim status
+  const isMeWinner = useMemo(() => {
+    if (!address || !myAlloc?.winner) return false;
+    return (
+      String(myAlloc.winner).toLowerCase() === String(address).toLowerCase() &&
+      (myAlloc.amount ?? 0n) > 0n
+    );
+  }, [address, myAlloc?.winner, myAlloc?.amount]);
+  const hasClaimed = !!myAlloc?.claimed;
+  const canClaim = approvalsBoth && isMeWinner && !hasClaimed;
+
+  // Load current user's allocation when ready
+  useEffect(() => {
+    let cancelled = false;
+    async function loadAlloc() {
+      if (!escrow || !address || !challengeId) return;
+      try {
+        const cid = BigInt(Number(challengeId));
+        const alloc = await escrow.allocationsForMe(address as any, cid);
+        if (!cancelled) setMyAlloc(alloc);
+      } catch {
+        if (!cancelled) setMyAlloc(null);
+      }
+    }
+    loadAlloc();
+    return () => { cancelled = true; };
+  }, [escrow, address, challengeId]);
 
   // No winners/claim UI here; see HackathonDetails winners tab
 
@@ -217,6 +248,39 @@ export default function ChallengeDetails() {
                   onClick={() => setConfirmOpen(true)}
                 >
                   {approving ? "Approving..." : "Approve Disbursement"}
+                </button>
+              </div>
+            )}
+
+            {/* Winner claim button (when both approvals done and connected user is a winner) */}
+            {canClaim && (
+              <div className="mt-3">
+                <button
+                  className="rounded-lg bg-emerald-600 text-white px-3 py-1.5 text-xs disabled:opacity-60"
+                  disabled={claiming}
+                  title={"Claim your prize payout"}
+                  onClick={async () => {
+                    if (!escrow || !challengeId) return;
+                    setClaiming(true);
+                    try {
+                      const cid = BigInt(Number(challengeId));
+                      const { hash } = await escrow.claimPayout(cid);
+                      setModalMsg(`Claim submitted. Tx: ${hash}`);
+                      setSuccessOpen(true);
+                      // Refresh allocation to reflect claimed status
+                      try {
+                        const alloc = await escrow.allocationsForMe(address as any, cid);
+                        setMyAlloc(alloc);
+                      } catch {}
+                    } catch (e: any) {
+                      setModalMsg(e?.shortMessage || e?.message || "Claim failed.");
+                      setErrorOpen(true);
+                    } finally {
+                      setClaiming(false);
+                    }
+                  }}
+                >
+                  {claiming ? "Claiming..." : "Claim Prize"}
                 </button>
               </div>
             )}
