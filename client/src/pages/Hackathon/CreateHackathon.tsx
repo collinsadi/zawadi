@@ -4,6 +4,7 @@ import type { Hackathon } from '../../types/Hackathon';
 import OrganizerStep from '../../components/CreateHackathon/OrganizerStep';
 import HackathonStep from '../../components/CreateHackathon/HackathonStep';
 import DetailsStep from '../../components/CreateHackathon/DetailsStep';
+import { uploadHackathonJson } from '../../services/ipfsService';
 
 type Step = 1 | 2 | 3;
 
@@ -70,9 +71,10 @@ export default function CreateHackathonPage() {
         ...form,
         description: form.description, // already markdown string
       };
-      // For now, just log the payload. Integrate with API/contract later.
-      console.log('Hackathon payload', payload);
-      alert('Hackathon draft created in console as JSON. Ready to integrate with backend.');
+      // Upload to IPFS via server route (Pinata)
+      const { cid } = await uploadHackathonJson(payload);
+      console.log('IPFS CID:', cid);
+      alert(`Hackathon uploaded to IPFS. CID: ${cid}`);
     } finally {
       setSubmitting(false);
     }

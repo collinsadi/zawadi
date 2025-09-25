@@ -12,6 +12,7 @@ import { specs } from "./common/config/swagger";
 import { startFactoryEventListener } from "./common/services/blockchainService";
 import { hackathonRouter } from "./modules/Hackathon/routes"
 import { userRouter } from "./modules/User/routes/userRoutes"
+import { ipfsRouter } from "./modules/IPFS/routes";
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
@@ -50,6 +51,7 @@ app.use(express.static("./src/common/public"));
 app.use("/api/auth", authRoutes);
 app.use("/api/hackathons", hackathonRouter);
 app.use("/api/users", userRouter);
+app.use("/api/ipfs", ipfsRouter);
 
 // API Documentation
 app.use(
