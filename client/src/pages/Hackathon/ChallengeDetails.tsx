@@ -10,6 +10,7 @@ import { simulateContract, writeContract, waitForTransactionReceipt } from "wagm
 import { parseAbiItem } from "viem";
 import { config } from "../../config/wagmi";
 import ResultModal from "../../components/UI/ResultModal";
+import type { Approval } from "../../services/escrowService";
 
 export default function ChallengeDetails() {
   const { id, challengeId } = useParams();
@@ -22,6 +23,9 @@ export default function ChallengeDetails() {
   const [onChain, setOnChain] = useState<any>(null);
   const [hasW, setHasW] = useState<boolean>(false);
   const [funding, setFunding] = useState<boolean>(false);
+  const [approvals, setApprovals] = useState<Approval | null>(null);
+  const [approving, setApproving] = useState<boolean>(false);
+  const [confirmOpen, setConfirmOpen] = useState<boolean>(false);
   const [successOpen, setSuccessOpen] = useState(false);
   const [errorOpen, setErrorOpen] = useState(false);
   const [modalMsg, setModalMsg] = useState<string>("");
@@ -52,6 +56,11 @@ export default function ChallengeDetails() {
           const w = await esc.hasWinners(BigInt(cid));
           if (!cancelled) setHasW(!!w);
         } catch {}
+        try {
+          const a = await esc.approvals(BigInt(cid));
+          console.log(a);
+          if (!cancelled) setApprovals(a);
+        } catch {}
       } catch (e: any) {
         if (!cancelled) setError(e?.message || "Failed to load challenge");
       } finally {
@@ -64,7 +73,6 @@ export default function ChallengeDetails() {
 
   const title = ipfs?.title || (challengeId ? `Challenge #${challengeId}` : "Challenge");
   const cover = ipfs?.data?.image || "";
-  const brief = ipfs?.brief || "";
   const details = ipfs?.data?.details || ipfs?.brief || "";
   const sponsorName = ipfs?.sponsor?.name || (onChain?.sponsor ?? "");
   const sponsorLogo = ipfs?.sponsor?.logo || "";
@@ -76,6 +84,11 @@ export default function ChallengeDetails() {
     if (!address || !onChain?.sponsor) return false;
     return String(address).toLowerCase() === String(onChain.sponsor).toLowerCase();
   }, [address, onChain?.sponsor]);
+
+  const approvalsCompleted = Number(!!approvals?.organiserApproved) + Number(!!approvals?.sponsorApproved);
+  const approvalsRequired = 2;
+  const approvalsRemaining = Math.max(0, approvalsRequired - approvalsCompleted);
+  const approvalsRemainingDisplay = approvals ? String(approvalsRemaining) : "—";
 
   const onFund = async () => {
     if (!escrow || !challengeId) return;
@@ -171,6 +184,39 @@ export default function ChallengeDetails() {
                 )}
               </div>
             )}
+
+            {/* Approvals status */}
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
+              <span className="inline-flex items-center rounded-full bg-slate-100 text-slate-700 px-2 py-0.5">
+                Approvals remaining: {approvalsRemainingDisplay}
+              </span>
+              <span className={
+                "inline-flex items-center rounded-full px-2 py-0.5 " +
+                (approvals?.organiserApproved ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-700")
+              }>
+                Organiser {approvals?.organiserApproved ? "approved" : "pending"}
+              </span>
+              <span className={
+                "inline-flex items-center rounded-full px-2 py-0.5 " +
+                (approvals?.sponsorApproved ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-700")
+              }>
+                Sponsor {approvals?.sponsorApproved ? "approved" : "pending"}
+              </span>
+            </div>
+
+            {/* Sponsor approve button (only when funded, winners exist, and sponsor not yet approved) */}
+            {isFunded && isSponsor && hasW && !approvals?.sponsorApproved && (
+              <div className="mt-3">
+                <button
+                  className="rounded-lg bg-primary-600 text-white px-3 py-1.5 text-xs disabled:opacity-60"
+                  disabled={approving}
+                  title={"Approve funds disbursement"}
+                  onClick={() => setConfirmOpen(true)}
+                >
+                  {approving ? "Approving..." : "Approve Disbursement"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -195,6 +241,51 @@ export default function ChallengeDetails() {
           </Link>
         </div>
       </main>
+      {/* Confirm Approve Modal */}
+      {confirmOpen && (
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setConfirmOpen(false)} />
+          <div className="absolute inset-0 p-4 sm:p-6 flex items-center justify-center">
+            <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl overflow-hidden">
+              <div className="p-4 sm:p-5">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Confirm Approval</h3>
+                <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">
+                  This approval moves the challenge one step closer to allowing winners to withdraw their prizes. If you have any off-chain KYC or verification to perform, please ensure that is completed before approving.
+                </p>
+                <div className="mt-5 flex items-center justify-end gap-2">
+                  <button className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs" onClick={() => setConfirmOpen(false)}>Cancel</button>
+                  <button
+                    className="rounded-lg bg-primary-600 text-white px-3 py-1.5 text-xs disabled:opacity-60"
+                    disabled={approving}
+                    onClick={async () => {
+                      if (!escrow || !challengeId) return;
+                      setApproving(true);
+                      try {
+                        const cid = BigInt(Number(challengeId));
+                        const { hash } = await escrow.approveDistribution(cid);
+                        setModalMsg(`Approval submitted. Tx: ${hash}`);
+                        setSuccessOpen(true);
+                        setConfirmOpen(false);
+                        try {
+                          const a = await escrow.approvals(cid);
+                          setApprovals(a);
+                        } catch {}
+                      } catch (e: any) {
+                        setModalMsg(e?.shortMessage || e?.message || "Approval failed.");
+                        setErrorOpen(true);
+                      } finally {
+                        setApproving(false);
+                      }
+                    }}
+                  >
+                    {approving ? "Approving..." : "Confirm Approve"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <ResultModal
         open={successOpen}
         title="Success"

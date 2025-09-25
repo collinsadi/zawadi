@@ -84,13 +84,19 @@ export function createEscrowService(address: Address) {
       args: [sponsor],
     }) as Promise<boolean>;
 
-  const approvals = (challengeId: bigint) =>
-    readContract(config, {
+  const approvals = async (challengeId: bigint): Promise<Approval> => {
+    const res = await readContract(config, {
       abi: escrowAbi,
       address: escrowAddress,
       functionName: "approvals",
       args: [challengeId],
-    }) as Promise<Approval>;
+    });
+    const anyRes: any = res;
+    // Contract returns [sponsorApproved, organiserApproved]. Some decoders also add named props.
+    const sponsorApproved: boolean = typeof anyRes?.sponsorApproved === 'boolean' ? anyRes.sponsorApproved : !!anyRes?.[0];
+    const organiserApproved: boolean = typeof anyRes?.organiserApproved === 'boolean' ? anyRes.organiserApproved : !!anyRes?.[1];
+    return { sponsorApproved, organiserApproved };
+  };
 
   const allocations = (winner: Address) =>
     readContract(config, {
