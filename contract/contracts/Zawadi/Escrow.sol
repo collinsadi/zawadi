@@ -24,6 +24,8 @@ contract Escrow {
     mapping(uint256 => EscrowLib.Approval) public approvals;
     mapping(address => bool) public sponsors;
     address[] public whitelistedSponsors;
+    // index of all challenge IDs for efficient enumeration
+    uint256[] private _challengeIds;
 
     // modifiers
     modifier onlyOrganizer() {
@@ -115,8 +117,45 @@ contract Escrow {
             isFunded: false
         });
 
+        // Track id for enumeration
+        _challengeIds.push(challengeId);
+
         //emit the challenge added event
         emit ChallengeAdded(challengeId, msg.sender, _totalPrize, _ipfsCid);
+    }
+
+    /**
+     * @notice Returns all challenge IDs. For large sets prefer pagination.
+     */
+    function getChallengeIds() external view returns (uint256[] memory) {
+        return _challengeIds;
+    }
+
+    /**
+     * @notice Returns a page of challenges and their IDs
+     * @param offset starting index within the internal list
+     * @param limit maximum number of items to return
+     */
+    function getChallengesPage(uint256 offset, uint256 limit)
+        external
+        view
+        returns (EscrowLib.Challenge[] memory items, uint256[] memory ids)
+    {
+        uint256 len = _challengeIds.length;
+        if (offset >= len) {
+            return (new EscrowLib.Challenge[](0), new uint256[](0));
+        }
+        uint256 end = offset + limit;
+        if (end > len) end = len;
+        uint256 n = end - offset;
+        items = new EscrowLib.Challenge[](n);
+        ids = new uint256[](n);
+        for (uint256 i = 0; i < n; i++) {
+            uint256 id_ = _challengeIds[offset + i];
+            ids[i] = id_;
+            items[i] = challenges[id_];
+        }
+        return (items, ids);
     }
 
     /**

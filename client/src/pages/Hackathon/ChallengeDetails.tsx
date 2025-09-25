@@ -64,7 +64,8 @@ export default function ChallengeDetails() {
 
   const title = ipfs?.title || (challengeId ? `Challenge #${challengeId}` : "Challenge");
   const cover = ipfs?.data?.image || "";
-  const brief = ipfs?.brief || ipfs?.data?.details || "";
+  const brief = ipfs?.brief || "";
+  const details = ipfs?.data?.details || ipfs?.brief || "";
   const sponsorName = ipfs?.sponsor?.name || (onChain?.sponsor ?? "");
   const sponsorLogo = ipfs?.sponsor?.logo || "";
   const sponsorLink = ipfs?.sponsor?.link || "";
@@ -183,7 +184,7 @@ export default function ChallengeDetails() {
             </div>
           ) : (
             <div data-color-mode={mdTheme} className="prose max-w-none dark:prose-invert prose-slate bg-transparent">
-              <MarkdownPreview source={brief || ""} style={{ backgroundColor: "transparent" }} />
+              <MarkdownPreview source={details || ""} style={{ backgroundColor: "transparent" }} />
             </div>
           )}
         </div>

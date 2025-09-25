@@ -14,9 +14,10 @@ type Props = {
   error: string;
   onClose: () => void;
   onSubmit: () => void;
+  submitting?: boolean;
 };
 
-export default function WinnersModal({ target, rows, onChangeRow, onAddRow, onRemoveRow, winnersTotal, totalPrizeNumber, winnersValid, error, onClose, onSubmit }: Props) {
+export default function WinnersModal({ target, rows, onChangeRow, onAddRow, onRemoveRow, winnersTotal, totalPrizeNumber, winnersValid, error, onClose, onSubmit, submitting = false }: Props) {
   return (
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
@@ -92,10 +93,11 @@ export default function WinnersModal({ target, rows, onChangeRow, onAddRow, onRe
               </button>
               <button
                 className="rounded-lg bg-primary-600 text-white px-3 py-1.5 text-xs disabled:opacity-50"
-                disabled={!winnersValid}
+                disabled={!winnersValid || submitting}
+                aria-busy={submitting}
                 onClick={onSubmit}
               >
-                Submit
+                {submitting ? 'Submitting...' : 'Submit'}
               </button>
             </div>
           </div>

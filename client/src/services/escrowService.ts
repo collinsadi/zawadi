@@ -1,8 +1,14 @@
-import type { Address } from 'viem';
-import { readContract, simulateContract, waitForTransactionReceipt, writeContract, getPublicClient } from 'wagmi/actions';
-import { parseAbiItem } from 'viem';
-import { config } from '../config/wagmi';
-import escrowAbi from '../abi/escrow.json';
+import type { Address } from "viem";
+import {
+  readContract,
+  simulateContract,
+  waitForTransactionReceipt,
+  writeContract,
+  getPublicClient,
+} from "wagmi/actions";
+import { parseAbiItem } from "viem";
+import { config } from "../config/wagmi";
+import escrowAbi from "../abi/escrow.json";
 
 // Types aligned with EscrowLib structs (approximate based on Solidity)
 export type Challenge = {
@@ -36,28 +42,28 @@ export function createEscrowService(address: Address) {
     readContract(config, {
       abi: escrowAbi,
       address: escrowAddress,
-      functionName: 'organizer',
+      functionName: "organizer",
     }) as Promise<Address>;
 
   const isLocked = () =>
     readContract(config, {
       abi: escrowAbi,
       address: escrowAddress,
-      functionName: 'isLocked',
+      functionName: "isLocked",
     }) as Promise<boolean>;
 
   const challengeCount = () =>
     readContract(config, {
       abi: escrowAbi,
       address: escrowAddress,
-      functionName: 'challengeCount',
+      functionName: "challengeCount",
     }) as Promise<bigint>;
 
   const getChallenge = (challengeId: bigint) =>
     readContract(config, {
       abi: escrowAbi,
       address: escrowAddress,
-      functionName: 'getChallenge',
+      functionName: "getChallenge",
       args: [challengeId],
     }) as Promise<Challenge>;
 
@@ -66,7 +72,7 @@ export function createEscrowService(address: Address) {
     readContract(config, {
       abi: escrowAbi,
       address: escrowAddress,
-      functionName: 'challenges',
+      functionName: "challenges",
       args: [challengeId],
     }) as Promise<Challenge>;
 
@@ -74,7 +80,7 @@ export function createEscrowService(address: Address) {
     readContract(config, {
       abi: escrowAbi,
       address: escrowAddress,
-      functionName: 'sponsors',
+      functionName: "sponsors",
       args: [sponsor],
     }) as Promise<boolean>;
 
@@ -82,7 +88,7 @@ export function createEscrowService(address: Address) {
     readContract(config, {
       abi: escrowAbi,
       address: escrowAddress,
-      functionName: 'approvals',
+      functionName: "approvals",
       args: [challengeId],
     }) as Promise<Approval>;
 
@@ -90,7 +96,7 @@ export function createEscrowService(address: Address) {
     readContract(config, {
       abi: escrowAbi,
       address: escrowAddress,
-      functionName: 'allocations',
+      functionName: "allocations",
       args: [winner],
     }) as Promise<Allocation>;
 
@@ -99,14 +105,14 @@ export function createEscrowService(address: Address) {
     readContract(config, {
       abi: escrowAbi,
       address: escrowAddress,
-      functionName: 'getWhitelistedSponsors',
+      functionName: "getWhitelistedSponsors",
     }) as Promise<Address[]>;
 
   // Logs-based enumeration of whitelisted sponsors
   const listWhitelistedSponsors = async (): Promise<Address[]> => {
     const publicClient = getPublicClient(config);
     if (!publicClient) return [];
-    const event = parseAbiItem('event SponsorWhitelisted(address sponsor)');
+    const event = parseAbiItem("event SponsorWhitelisted(address sponsor)");
     const logs = await publicClient.getLogs({
       address: escrowAddress,
       event,
@@ -123,20 +129,102 @@ export function createEscrowService(address: Address) {
   // Challenges helpers
   type ChallengeWithId = { id: bigint; data: Challenge };
 
+  const getChallengesPage = async (offset: bigint, limit: bigint) =>
+    readContract(config, {
+      abi: escrowAbi,
+      address: escrowAddress,
+      functionName: "getChallengesPage",
+      args: [offset, limit],
+    }) as Promise<[Challenge[], bigint[]]>;
+
+  const getChallengeIds = async (): Promise<bigint[]> =>
+    readContract(config, {
+      abi: escrowAbi,
+      address: escrowAddress,
+      functionName: "getChallengeIds",
+      args: [],
+    }) as Promise<bigint[]>;
+
   const getAllChallenges = async (): Promise<ChallengeWithId[]> => {
-    const total = await challengeCount().catch(() => 0n);
-    const ids = Array.from({ length: Number(total) }, (_, i) => BigInt(i));
-    const results = await Promise.all(
-      ids.map(async (id) => ({ id, data: await getChallenge(id).catch(() => ({} as any)) }))
-    );
-    return results.filter((r) => r.data && typeof r.data.ipfsCid === 'string');
+    // Prefer paginated getter
+    try {
+      console.log('[escrowService] getAllChallenges: using paginated getter');
+      const pageSize = 50n;
+      let offset = 0n;
+      const out: ChallengeWithId[] = [];
+      while (true) {
+        const [items, ids] = await getChallengesPage(offset, pageSize);
+        console.log('[escrowService] page', { offset: offset.toString(), got: ids?.length || 0 });
+        if (!ids || ids.length === 0) break;
+        for (let i = 0; i < ids.length; i++) {
+          out.push({ id: ids[i], data: items[i] });
+        }
+        if (ids.length < Number(pageSize)) break;
+        offset += BigInt(ids.length);
+      }
+      console.log('[escrowService] total challenges collected (paginated):', out.length);
+      return out;
+    } catch {
+      // Fallback to legacy: challengeCount + logs
+      console.warn('[escrowService] getAllChallenges: paginated getter failed, falling back to legacy');
+      const seen = new Set<string>();
+      const out: ChallengeWithId[] = [];
+      const total = await challengeCount().catch(() => 0n);
+      console.log('[escrowService] fallback challengeCount:', total.toString());
+      const tryIds0 = Array.from({ length: Number(total) }, (_, i) =>
+        BigInt(i)
+      );
+      for (const id of tryIds0) {
+        try {
+          const data = await getChallenge(id);
+          if (data && typeof (data as any).ipfsCid === "string") {
+            const key = id.toString();
+            if (!seen.has(key)) {
+              seen.add(key);
+              out.push({ id, data });
+            }
+          }
+        } catch {}
+      }
+      try {
+        const publicClient = getPublicClient(config);
+        if (publicClient) {
+          const evt = parseAbiItem(
+            "event ChallengeAdded(uint256 indexed challengeId, address sponsor, uint256 totalPrize, string ipfsCid)"
+          );
+          const logs = await publicClient.getLogs({
+            address: escrowAddress,
+            event: evt,
+            fromBlock: 0n,
+          });
+          console.log('[escrowService] fallback logs ChallengeAdded count:', logs.length);
+          for (const l of logs) {
+            const id = BigInt(l.args?.challengeId as any);
+            const key = id.toString();
+            if (seen.has(key)) continue;
+            try {
+              const data = await getChallenge(id);
+              if (data && typeof (data as any).ipfsCid === "string") {
+                seen.add(key);
+                out.push({ id, data });
+              }
+            } catch {}
+          }
+        }
+      } catch {}
+      out.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      console.log('[escrowService] total challenges collected (fallback):', out.length);
+      return out;
+    }
   };
 
   const hasWinners = async (challengeId: bigint): Promise<boolean> => {
     try {
       const publicClient = getPublicClient(config);
       if (!publicClient) return false;
-      const event = parseAbiItem('event WinnersAdded(uint256 indexed challengeId, address[] winners, uint256[] allocations)');
+      const event = parseAbiItem(
+        "event WinnersAdded(uint256 indexed challengeId, address[] winners, uint256[] allocations)"
+      );
       const logs = await publicClient.getLogs({
         address: escrowAddress,
         event,
@@ -154,7 +242,7 @@ export function createEscrowService(address: Address) {
     const { request } = await simulateContract(config, {
       abi: escrowAbi,
       address: escrowAddress,
-      functionName: 'whitelistSponsor',
+      functionName: "whitelistSponsor",
       args: [sponsorAddr],
     });
     const hash = await writeContract(config, request);
@@ -171,7 +259,7 @@ export function createEscrowService(address: Address) {
     const { request } = await simulateContract(config, {
       abi: escrowAbi,
       address: escrowAddress,
-      functionName: 'addChallenge',
+      functionName: "addChallenge",
       args: [totalPrize, token, isERC20, ipfsCid],
     });
     const hash = await writeContract(config, request);
@@ -184,7 +272,7 @@ export function createEscrowService(address: Address) {
     const { request } = await simulateContract(config, {
       abi: escrowAbi,
       address: escrowAddress,
-      functionName: 'fundChallenge',
+      functionName: "fundChallenge",
       args: [challengeId],
       // viem/wagmi supports specifying value in simulate/write for payable fns
       value,
@@ -202,7 +290,7 @@ export function createEscrowService(address: Address) {
     const { request } = await simulateContract(config, {
       abi: escrowAbi,
       address: escrowAddress,
-      functionName: 'addWinners',
+      functionName: "addWinners",
       args: [challengeId, winners, amounts],
     });
     const hash = await writeContract(config, request);
@@ -214,7 +302,7 @@ export function createEscrowService(address: Address) {
     const { request } = await simulateContract(config, {
       abi: escrowAbi,
       address: escrowAddress,
-      functionName: 'approveDistribution',
+      functionName: "approveDistribution",
       args: [challengeId],
     });
     const hash = await writeContract(config, request);
@@ -226,7 +314,7 @@ export function createEscrowService(address: Address) {
     const { request } = await simulateContract(config, {
       abi: escrowAbi,
       address: escrowAddress,
-      functionName: 'lockContract',
+      functionName: "lockContract",
       args: [],
     });
     const hash = await writeContract(config, request);
@@ -238,7 +326,7 @@ export function createEscrowService(address: Address) {
     const { request } = await simulateContract(config, {
       abi: escrowAbi,
       address: escrowAddress,
-      functionName: 'unLockContract',
+      functionName: "unLockContract",
       args: [],
     });
     const hash = await writeContract(config, request);

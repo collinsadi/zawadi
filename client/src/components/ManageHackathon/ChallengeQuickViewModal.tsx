@@ -22,7 +22,7 @@ export default function ChallengeQuickViewModal({ selected, approvals, onClose, 
           <div className="p-4">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{selected.title}</h3>
             <div className="mt-1 text-xs text-slate-500">Challenge #{selected.id} • Prize: {selected.totalPrize} • Token: {selected.isERC20 ? selected.token : 'ETH'}</div>
-            <p className="mt-3 text-sm text-slate-700 dark:text-slate-300">{selected.data.details}</p>
+            <p className="mt-3 text-sm text-slate-700 dark:text-slate-300">{selected.data.brief}</p>
 
             <div className="mt-4 flex items-center justify-between">
               <a href={selected.sponsorMeta.link} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-primary-700 dark:text-primary-300">

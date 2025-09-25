@@ -10,6 +10,7 @@ export type EscrowChallenge = {
   data: {
     image: string;
     details: string;
+    brief: string;
   };
   sponsorMeta: {
     link: string;

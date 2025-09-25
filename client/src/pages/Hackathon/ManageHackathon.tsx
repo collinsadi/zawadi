@@ -10,7 +10,9 @@ import type { EscrowChallenge, EscrowApproval } from "../../components/ManageHac
 import { getHackathonById as getHackathonOnChain } from "../../services/factoryService";
 import { createEscrowService } from "../../services/escrowService";
 import ResultModal from "../../components/UI/ResultModal";
-import { isAddress } from "viem";
+import { isAddress, parseUnits } from "viem";
+import { readContract } from "wagmi/actions";
+import { config } from "../../config/wagmi";
 
 import { getPinataUrl } from "../../config/pinata";
 
@@ -20,12 +22,21 @@ export default function ManageHackathon() {
   const navigate = useNavigate();
   const { address } = useAccount();
 
+  // Render-level debug to ensure component is mounting/rerendering
+  console.log('[Manage] render', { id, address });
+  useEffect(() => {
+    console.log('[Manage] mounted');
+    return () => {
+      console.log('[Manage] unmounted');
+    };
+  }, []);
+
   const initial = (location.state as any) || {};
   const [organiser, setOrganiser] = useState<string>(initial.organiser || "");
   const [escrowAddr, setEscrowAddr] = useState<string>(initial.escrow || "");
   const [escrow, setEscrow] = useState<ReturnType<typeof createEscrowService> | null>(null);
-  const [loadingEscrow, setLoadingEscrow] = useState<boolean>(false);
-  const [checkingSponsor, setCheckingSponsor] = useState<boolean>(false);
+  const [loadingEscrow, setLoadingEscrow] = useState<boolean>(true);
+  const [checkingSponsor, setCheckingSponsor] = useState<boolean>(true);
   const [isSponsor, setIsSponsor] = useState<boolean>(false);
 
   // Whitelist state (UI-only for now)
@@ -41,12 +52,23 @@ export default function ManageHackathon() {
   // Challenges and approvals
   const [challenges, setChallenges] = useState<EscrowChallenge[]>(initial.challenges || []);
   const [approvals, setApprovals] = useState<Record<number, EscrowApproval>>(initial.approvals || {});
+  const [loadingChallenges, setLoadingChallenges] = useState<boolean>(false);
 
   const fundedChallenges = useMemo(() => challenges.filter((c) => c.isFunded), [challenges]);
   const [selected, setSelected] = useState<EscrowChallenge | null>(null);
   const [winnersTarget, setWinnersTarget] = useState<EscrowChallenge | null>(null);
   const [winnersRows, setWinnersRows] = useState<Array<{ address: string; amount: string }>>([]);
   const [winnersError, setWinnersError] = useState<string>("");
+  const [submittingWinners, setSubmittingWinners] = useState<boolean>(false);
+
+  // Minimal ERC20 ABI to read decimals
+  const ERC20_DECIMALS_ABI = [{
+    type: "function",
+    name: "decimals",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint8", name: "" }],
+  }] as const;
 
   // Load escrow address and organizer from factory by id
   useEffect(() => {
@@ -57,8 +79,10 @@ export default function ManageHackathon() {
         setLoadingEscrow(true);
         const onChain = await getHackathonOnChain(id as any);
         if (cancelled) return;
-        setOrganiser(onChain.organizer as unknown as string);
+        const orgAddr = onChain.organizer as unknown as string;
+        setOrganiser(orgAddr);
         const ea = onChain.escrowContract as unknown as string;
+        console.log('[Manage] loaded hackathon on-chain', { id, organizer: orgAddr, escrow: ea });
         setEscrowAddr(ea);
         setEscrow(createEscrowService(ea as any));
       } catch (e) {
@@ -84,6 +108,7 @@ export default function ManageHackathon() {
           whitelist.map(async (addr) => ({ addr, ok: await escrow.sponsors(addr as any).catch(() => false) }))
         );
         const onlyWhitelisted = results.filter(r => r.ok).map(r => r.addr);
+        console.log('[Manage] verified existing whitelist', { count: onlyWhitelisted.length });
         if (!cancelled) setWhitelist(onlyWhitelisted);
       } finally {
         if (!cancelled) setVerifying(false);
@@ -97,14 +122,18 @@ export default function ManageHackathon() {
   useEffect(() => {
     let cancelled = false;
     async function check() {
+      // If we don't yet have escrow or address, mark as checking and wait
       if (!escrow || !address) {
         setIsSponsor(false);
+        setCheckingSponsor(false);
+        console.log('[Manage] sponsor check skipped (escrow or address missing)', { hasEscrow: !!escrow, hasAddress: !!address });
         return;
       }
       setCheckingSponsor(true);
       try {
         const ok = await escrow.sponsors(address as any).catch(() => false);
         if (!cancelled) setIsSponsor(!!ok);
+        console.log('[Manage] sponsor check result', { address, ok });
       } finally {
         if (!cancelled) setCheckingSponsor(false);
       }
@@ -120,13 +149,17 @@ export default function ManageHackathon() {
 
   // Route guard: only organizer or sponsor can access
   useEffect(() => {
-    if (loadingEscrow || checkingSponsor) return;
+    // Wait until we've loaded escrow, organizer, and checked sponsor status
     if (!id) return;
+    if (loadingEscrow || checkingSponsor) return;
+    if (!escrow) return; // ensure escrow initialized
+    if (!organiser && !isSponsor) return; // wait for organiser fetch or sponsor check
     const authorized = isOrganizer || isSponsor;
+    console.log('[Manage] guard evaluation', { id, loadingEscrow, checkingSponsor, hasEscrow: !!escrow, organiser, isOrganizer, isSponsor, authorized });
     if (!authorized) {
       navigate(`/hackathons/${id}`, { replace: true });
     }
-  }, [id, isOrganizer, isSponsor, loadingEscrow, checkingSponsor, navigate]);
+  }, [id, isOrganizer, isSponsor, loadingEscrow, checkingSponsor, navigate, escrow, organiser]);
 
   // Load full on-chain whitelist list (enumerable getter, with logs fallback)
   useEffect(() => {
@@ -150,6 +183,74 @@ export default function ManageHackathon() {
     }
     fetchWhitelist();
     return () => { cancelled = true; };
+  }, [escrow]);
+
+  // Load challenges from escrow and hydrate with IPFS metadata + approvals
+  useEffect(() => {
+    let cancelled = false;
+    async function loadChallenges() {
+      if (!escrow) return;
+      setLoadingChallenges(true);
+      try {
+        const all = await escrow.getAllChallenges();
+        // Map on-chain + IPFS into EscrowChallenge cards
+        const items: EscrowChallenge[] = await Promise.all(
+          all.map(async (row) => {
+            const onChain = row.data;
+            const idNum = Number(row.id);
+            const cid = onChain.ipfsCid;
+            let ipfs: any = {};
+            try {
+              const res = await fetch(getPinataUrl(cid));
+              if (res.ok) ipfs = await res.json();
+            } catch {}
+            const title = ipfs?.title || `Challenge #${idNum}`;
+            const totalPrize = ipfs?.totalPrize || String(onChain.totalPrize);
+            const isERC20 = !!onChain.isERC20;
+            const token = isERC20 ? (onChain.token as any as string) : "ETH";
+            return {
+              id: idNum,
+              title,
+              totalPrize,
+              token,
+              isERC20,
+              ipfsCid: cid,
+              isFunded: !!onChain.isFunded,
+              sponsor: String(onChain.sponsor),
+              data: {
+                image: ipfs?.data?.image || "",
+                details: ipfs?.data?.details || ipfs?.brief || "",
+                brief: ipfs?.brief || ipfs?.data?.details || "",
+              },
+              sponsorMeta: {
+                link: ipfs?.sponsor?.link || "",
+                name: ipfs?.sponsor?.name || String(onChain.sponsor),
+                logo: ipfs?.sponsor?.logo || "",
+              },
+            } as EscrowChallenge;
+          })
+        );
+        if (!cancelled) setChallenges(items);
+
+        // Prefetch approvals for each challenge to drive UI state
+        try {
+          const approvalsArr = await Promise.all(
+            all.map((row) => escrow.approvals(row.id))
+          );
+          const approvalsMap: Record<number, EscrowApproval> = {};
+          for (let i = 0; i < all.length; i++) {
+            approvalsMap[Number(all[i].id)] = approvalsArr[i];
+          }
+          if (!cancelled) setApprovals(approvalsMap);
+        } catch {}
+      } finally {
+        if (!cancelled) setLoadingChallenges(false);
+      }
+    }
+    loadChallenges();
+    return () => {
+      cancelled = true;
+    };
   }, [escrow]);
 
   // Handlers
@@ -280,11 +381,25 @@ export default function ManageHackathon() {
           />
 
           {/* Challenges and Modals */}
-          <ChallengesGrid
-            challenges={challenges}
-            approvals={approvals}
-            onSelect={(c) => setSelected(c)}
-          />
+          {loadingChallenges ? (
+            <section className="lg:col-span-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="h-64 rounded-2xl bg-slate-200 dark:bg-slate-800 animate-pulse" />
+                ))}
+              </div>
+            </section>
+          ) : challenges.length === 0 ? (
+            <section className="lg:col-span-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 text-center text-sm text-slate-500">
+              No challenges found for this hackathon.
+            </section>
+          ) : (
+            <ChallengesGrid
+              challenges={challenges}
+              approvals={approvals}
+              onSelect={(c) => setSelected(c)}
+            />
+          )}
 
           {selected && (
             <ChallengeQuickViewModal
@@ -308,14 +423,108 @@ export default function ManageHackathon() {
               winnersValid={winnersValid}
               error={winnersError}
               onClose={() => setWinnersTarget(null)}
-              onSubmit={() => {
-                if (!winnersValid || !winnersTarget) {
+              submitting={submittingWinners}
+              onSubmit={async () => {
+                if (!escrow) {
+                  setModalMsg("Escrow not initialized yet. Try again in a moment.");
+                  setErrorOpen(true);
+                  return;
+                }
+                if (!winnersTarget) return;
+                setWinnersError("");
+                // Basic validations
+                if (!winnersValid) {
                   setWinnersError('Please fix validation errors.');
                   return;
                 }
-                console.log('submitWinners', { challengeId: winnersTarget.id, rows: winnersRows });
-                alert('Winners submitted (demo)');
-                setWinnersTarget(null);
+                // Validate addresses
+                const invalid = winnersRows.find(r => !isAddress(r.address as any));
+                if (invalid) {
+                  setWinnersError('One or more winner addresses are invalid.');
+                  return;
+                }
+                try {
+                  setSubmittingWinners(true);
+                  const winners = winnersRows.map(r => r.address as any);
+                  // Determine decimals
+                  let decimals = 18n;
+                  if (winnersTarget.isERC20) {
+                    const d = await readContract(config, {
+                      abi: ERC20_DECIMALS_ABI,
+                      address: winnersTarget.token as any,
+                      functionName: 'decimals',
+                    }) as unknown as bigint | number;
+                    decimals = BigInt(d as any);
+                  }
+                  const amounts = winnersRows.map(r => {
+                    const clean = (r.amount || '').toString().replace(/,/g, '');
+                    return parseUnits(clean, Number(decimals));
+                  });
+                  const { hash } = await escrow.addWinners(BigInt(winnersTarget.id), winners as any, amounts as any);
+                  setModalMsg(`Winners submitted successfully. Tx: ${hash}`);
+                  setSuccessOpen(true);
+                  setWinnersTarget(null);
+                  // Refresh challenges and approvals
+                  try {
+                    setLoadingChallenges(true);
+                    const all = await escrow.getAllChallenges();
+                    const items: EscrowChallenge[] = await Promise.all(
+                      all.map(async (row) => {
+                        const onChain = row.data;
+                        const idNum = Number(row.id);
+                        const cid = onChain.ipfsCid;
+                        let ipfs: any = {};
+                        try {
+                          const res = await fetch(getPinataUrl(cid));
+                          if (res.ok) ipfs = await res.json();
+                        } catch {}
+                        const title = ipfs?.title || `Challenge #${idNum}`;
+                        const totalPrize = ipfs?.totalPrize || String(onChain.totalPrize);
+                        const isERC20 = !!onChain.isERC20;
+                        const token = isERC20 ? (onChain.token as any as string) : "ETH";
+                        return {
+                          id: idNum,
+                          title,
+                          totalPrize,
+                          token,
+                          isERC20,
+                          ipfsCid: cid,
+                          isFunded: !!onChain.isFunded,
+                          sponsor: String(onChain.sponsor),
+                          data: {
+                            image: ipfs?.data?.image || "",
+                            details: ipfs?.data?.details || ipfs?.brief || "",
+                            brief: ipfs?.brief || ipfs?.data?.details || "",
+                          },
+                          sponsorMeta: {
+                            link: ipfs?.sponsor?.link || "",
+                            name: ipfs?.sponsor?.name || String(onChain.sponsor),
+                            logo: ipfs?.sponsor?.logo || "",
+                          },
+                        } as EscrowChallenge;
+                      })
+                    );
+                    setChallenges(items);
+                    try {
+                      const approvalsArr = await Promise.all(
+                        all.map((row) => escrow.approvals(row.id))
+                      );
+                      const approvalsMap: Record<number, EscrowApproval> = {};
+                      for (let i = 0; i < all.length; i++) {
+                        approvalsMap[Number(all[i].id)] = approvalsArr[i];
+                      }
+                      setApprovals(approvalsMap);
+                    } catch {}
+                  } finally {
+                    setLoadingChallenges(false);
+                  }
+                } catch (e: any) {
+                  console.error(e);
+                  setModalMsg(e?.shortMessage || e?.message || 'Failed to submit winners.');
+                  setErrorOpen(true);
+                } finally {
+                  setSubmittingWinners(false);
+                }
               }}
             />
           )}
