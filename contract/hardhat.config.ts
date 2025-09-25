@@ -36,6 +36,26 @@ const config: HardhatUserConfig = {
       url: configVariable("SEPOLIA_RPC_URL"),
       accounts: [configVariable("SEPOLIA_PRIVATE_KEY")],
     },
+
+    hardhat: {
+      type: "edr-simulated",
+      chainType: "l1",
+      chainId: 31337,
+      // Enhanced local development configuration
+      accounts: {
+        count: 20,
+        accountsBalance: "10000000000000000000000", // 10,000 ETH
+      },
+      // Enable detailed logging for local development
+      loggingEnabled: true,
+      // Enable mining for better local testing
+      allowBlocksWithSameTimestamp: true,
+      mining: {
+        auto: true,
+        interval: 0,
+        
+      },
+    },
   },
 };
 
