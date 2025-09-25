@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import Navbar from "../../components/UI/Navbar";
 import type { Hackathon } from "../../types/Hackathon";
 import MarkdownPreview from "@uiw/react-markdown-preview";
 import ChallengeCards, { type ChallengeCard } from "../../components/Challenge/ChallengeCards";
+import { getHackathonById as getHackathonOnChain } from "../../services/factoryService";
+import { getPinataUrl } from "../../config/pinata";
 
 // Simple helpers
 const fmtDate = (iso?: string) => {
@@ -21,44 +23,44 @@ const fmtDate = (iso?: string) => {
 };
 
 const currencyUnit = (code: string) => code || "USD";
+const formatAmount = (v: string | number) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? new Intl.NumberFormat(undefined).format(n) : String(v);
+};
 
 export default function HackathonDetails() {
+  const { id } = useParams();
   const location = useLocation();
-  const initial = (location.state as { hackathon?: Hackathon } | null)
-    ?.hackathon;
+  const initial = (location.state as { hackathon?: Hackathon } | null)?.hackathon;
 
-  // Fallback demo data if none passed via navigation state
-  const [hackathon] = useState<Hackathon>(
-    initial || {
-      id: "demo-eth-bam",
-      title: "ETHiopia x BAM Hackathon",
-      cover:
-        "https://images.unsplash.com/photo-1758640920659-0bb864175983?q=80&w=2342&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-      description: `## About\n\nThis is a demo Hackathon description. Add full markdown here.`,
-      organiser: {
-        name: "BAM",
-        logo: "https://res.cloudinary.com/demo/image/upload/w_120,h_120,c_thumb,g_face,r_max/flower.jpg",
-        url: "https://example.com",
-      },
-      details: {
-        prizePool: "500,000",
-        currency: "USD",
-        startDate: new Date().toISOString(),
-        endDate: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
-        location: "Addis Ababa, Ethiopia",
-        tags: [
-          "blockchain",
-          "ai",
-          "agent",
-          "africa",
-          "depin",
-          "infrastructure",
-          "financial inclusion",
-        ],
-      },
-      type: "In-person",
+  const [hackathon, setHackathon] = useState<Hackathon | null>(initial ?? null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      if (hackathon || !id) return; // have data or no id
+      setLoading(true);
+      setError(null);
+      try {
+        const onChain = await getHackathonOnChain(id as any);
+        const url = getPinataUrl(onChain.ipfsCid);
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as Omit<Hackathon, "id">;
+        if (!cancelled) setHackathon({ id, ...data });
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
-  );
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
   const [activeTab, setActiveTab] = useState<
     "challenges" | "details" | "winners"
@@ -85,10 +87,11 @@ export default function HackathonDetails() {
   }, []);
 
   const dateRange = useMemo(() => {
+    if (!hackathon) return "";
     const start = fmtDate(hackathon.details.startDate);
     const end = fmtDate(hackathon.details.endDate);
     return `${start} - ${end}`;
-  }, [hackathon.details.startDate, hackathon.details.endDate]);
+  }, [hackathon?.details.startDate, hackathon?.details.endDate]);
 
   // Demo challenges (replace with IPFS/contract fetched data later)
   const demoChallenges: ChallengeCard[] = [
@@ -132,21 +135,30 @@ export default function HackathonDetails() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <Navbar />
       <main className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8">
+        {error && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">
+            Failed to load hackathon: {error}
+          </div>
+        )}
         {/* Header card */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* Cover */}
           <div className="lg:col-span-2 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-            <div
-              className="w-full h-full aspect-[16/7]"
-              style={{
-                backgroundImage: `url(${hackathon.cover})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-                backgroundRepeat: "no-repeat",
-              }}
-              aria-label={hackathon.title}
-              role="img"
-            />
+            {loading || !hackathon ? (
+              <div className="w-full h-full aspect-[16/7] bg-slate-200 dark:bg-slate-800 animate-pulse" />
+            ) : (
+              <div
+                className="w-full h-full aspect-[16/7]"
+                style={{
+                  backgroundImage: `url(${hackathon.cover})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  backgroundRepeat: "no-repeat",
+                }}
+                aria-label={hackathon.title}
+                role="img"
+              />
+            )}
           </div>
 
           {/* Side panel */}
@@ -155,12 +167,18 @@ export default function HackathonDetails() {
               Prize Pool
             </div>
             <div className="mt-1 flex items-baseline gap-2">
-              <div className="text-4xl font-extrabold text-primary-600">
-                {hackathon.details.prizePool}
-              </div>
-              <div className="text-sm font-semibold text-slate-500">
-                {currencyUnit(hackathon.details.currency)}
-              </div>
+              {loading || !hackathon ? (
+                <div className="h-9 w-40 bg-slate-200 dark:bg-slate-800 rounded animate-pulse" />
+              ) : (
+                <>
+                  <div className="text-4xl font-extrabold text-primary-600">
+                    {formatAmount(hackathon.details.prizePool)}
+                  </div>
+                  <div className="text-sm font-semibold text-slate-500">
+                    {currencyUnit(hackathon.details.currency)}
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="mt-4 space-y-3 text-sm text-slate-700 dark:text-slate-300">
@@ -168,47 +186,54 @@ export default function HackathonDetails() {
                 <span className="mt-1 h-2 w-2 rounded-full bg-slate-400" />
                 <div>
                   <div className="font-medium">Type</div>
-                  <div className="text-slate-500">{hackathon.type}</div>
+                  <div className="text-slate-500">{loading || !hackathon ? "—" : hackathon.type}</div>
                 </div>
               </div>
               <div className="flex items-start gap-2">
                 <span className="mt-1 h-2 w-2 rounded-full bg-slate-400" />
                 <div>
-                  {hackathon.type === "In-person" && (
+                  {hackathon && hackathon.type === "In-person" && (
                     <>
                       <div className="font-medium">Location</div>
-                      <div className="text-slate-500">
-                        {hackathon.details.location}
-                      </div>
+                      <div className="text-slate-500">{hackathon.details.location}</div>
                     </>
                   )}
                 </div>
               </div>
               <div>
                 <div className="font-medium mb-2">Hackathon Tags</div>
-                <div className="flex flex-wrap gap-2">
-                  {hackathon.details.tags.slice(0, 12).map((tag, i) => (
-                    <span
-                      key={tag + i}
-                      className="rounded-full bg-primary-600/10 text-primary-700 dark:text-primary-300 text-xs px-2.5 py-1 border border-primary-600/20"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
+                {loading || !hackathon ? (
+                  <div className="flex flex-wrap gap-2">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <span key={i} className="h-6 w-16 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse" />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {hackathon.details.tags.slice(0, 12).map((tag, i) => (
+                      <span
+                        key={tag + i}
+                        className="rounded-full bg-primary-600/10 text-primary-700 dark:text-primary-300 text-xs px-2.5 py-1 border border-primary-600/20"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between pt-2">
                 <div className="flex items-center gap-2">
-                  {hackathon.organiser.logo && (
+                  {hackathon?.organiser.logo && (
                     <img
                       src={hackathon.organiser.logo}
                       alt={hackathon.organiser.name}
+                      loading="lazy"
                       className="h-7 w-7 rounded-full object-cover border border-slate-200 dark:border-slate-700"
                     />
                   )}
                   <div className="text-sm font-medium">
-                    {hackathon.organiser.name}
+                    {hackathon?.organiser.name || (loading ? "" : "")}
                   </div>
                 </div>
                 <button
@@ -231,14 +256,14 @@ export default function HackathonDetails() {
         {/* Title + meta */}
         <div className="mt-4 flex items-center justify-between">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100">
-              {hackathon.title}
-            </h1>
+            {loading || !hackathon ? (
+              <div className="h-7 w-64 bg-slate-200 dark:bg-slate-800 rounded animate-pulse" />
+            ) : (
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100">{hackathon.title}</h1>
+            )}
             <div className="text-xs text-slate-500 mt-1">{dateRange}</div>
           </div>
-          <div className="hidden sm:block text-slate-400">
-            {/* placeholder for bookmark/lock icons */}
-          </div>
+          <div className="hidden sm:block text-slate-400">{/* icons */}</div>
         </div>
 
         <div className="mt-6 border-b border-slate-200 dark:border-slate-800">
@@ -272,14 +297,16 @@ export default function HackathonDetails() {
             <ChallengeCards items={demoChallenges} />
           )}
           {activeTab === "details" && (
-            <div
-              data-color-mode={mdTheme}
-              className="prose max-w-none dark:prose-invert prose-slate bg-transparent"
-            >
-              <MarkdownPreview
-                source={hackathon.description || ""}
-                style={{ backgroundColor: "transparent" }}
-              />
+            <div data-color-mode={mdTheme} className="prose max-w-none dark:prose-invert prose-slate bg-transparent">
+              {loading || !hackathon ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className={`h-${i % 3 === 0 ? 6 : 4} w-full bg-slate-200 dark:bg-slate-800 rounded animate-pulse`} />
+                  ))}
+                </div>
+              ) : (
+                <MarkdownPreview source={hackathon.description || ""} style={{ backgroundColor: "transparent" }} />
+              )}
             </div>
           )}
           {activeTab === "winners" && (
