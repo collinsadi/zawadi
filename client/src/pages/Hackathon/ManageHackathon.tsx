@@ -1,32 +1,11 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import Navbar from "../../components/UI/Navbar";
-
-// Lightweight types mirroring Escrow.sol for UI purposes
-export type EscrowChallenge = {
-  id: number;
-  title: string;
-  totalPrize: string; // display-formatted for now
-  token: string; // address or 'ETH'
-  isERC20: boolean;
-  ipfsCid: string;
-  isFunded: boolean;
-  sponsor: string; // sponsor address (for permissions)
-  data: {
-    image: string;
-    details: string;
-  };
-  sponsorMeta: {
-    link: string;
-    name: string;
-    logo: string;
-  };
-};
-
-export type EscrowApproval = {
-  sponsorApproved: boolean;
-  organiserApproved: boolean;
-};
+import WhitelistPanel from "../../components/ManageHackathon/WhitelistPanel";
+import ChallengesGrid from "../../components/ManageHackathon/ChallengesGrid";
+import ChallengeQuickViewModal from "../../components/ManageHackathon/ChallengeQuickViewModal";
+import WinnersModal from "../../components/ManageHackathon/WinnersModal";
+import type { EscrowChallenge, EscrowApproval } from "../../components/ManageHackathon/types";
 
 // Demo data if none passed via navigation
 const DEMO_CHALLENGES: EscrowChallenge[] = [
@@ -134,11 +113,7 @@ export default function ManageHackathon() {
     setWinnersError("");
   };
 
-  const actionNeeded = (c: EscrowChallenge, a: EscrowApproval | undefined): string | null => {
-    if (!c.isFunded) return "Funding pending";
-    if (!a || (!a.organiserApproved || !a.sponsorApproved)) return "Distribution approval pending";
-    return null;
-  };
+  
 
   // Helpers for winners modal
   const parseAmount = (s: string) => Number((s || '').toString().replace(/,/g, '')) || 0;
@@ -193,234 +168,55 @@ export default function ManageHackathon() {
         {/* Main layout */}
         <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* Whitelist */}
-          <section className="lg:col-span-1 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Whitelisted Sponsors</h2>
-              <div className="text-[10px] text-slate-500">Organiser: {organiser}</div>
-            </div>
+          <WhitelistPanel
+            organiser={organiser}
+            whitelist={whitelist}
+            newSponsor={newSponsor}
+            onChangeNewSponsor={setNewSponsor}
+            onAddSponsor={addSponsor}
+            onRemoveSponsor={removeSponsor}
+          />
 
-            <div className="mt-3 flex gap-2">
-              <input
-                type="text"
-                value={newSponsor}
-                onChange={(e) => setNewSponsor(e.target.value)}
-                placeholder="0x..."
-                className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
-              <button
-                type="button"
-                onClick={addSponsor}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-700"
-              >
-                Add
-              </button>
-            </div>
+          {/* Challenges and Modals */}
+          <ChallengesGrid
+            challenges={challenges}
+            approvals={approvals}
+            onSelect={(c) => setSelected(c)}
+          />
 
-            <div className="mt-3 flex flex-wrap gap-2">
-              {whitelist.map((addr) => (
-                <span key={addr} className="inline-flex items-center gap-1 rounded-full bg-primary-600/10 text-primary-700 dark:text-primary-300 border border-primary-600/20 px-2.5 py-1 text-xs">
-                  {addr}
-                  <button aria-label={`Remove ${addr}`} onClick={() => removeSponsor(addr)} className="ml-1 hover:text-primary-900">×</button>
-                </span>
-              ))}
-              {whitelist.length === 0 && (
-                <span className="text-xs text-slate-500">No sponsors whitelisted yet.</span>
-              )}
-            </div>
-          </section>
+          {selected && (
+            <ChallengeQuickViewModal
+              selected={selected}
+              approvals={approvals}
+              onClose={() => setSelected(null)}
+              onOpenWinners={(c) => openWinners(c)}
+              onApprove={(challengeId, actor) => approveDistribution(challengeId, actor)}
+            />
+          )}
 
-          {/* Challenges */}
-          <section className="lg:col-span-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Challenges</h2>
-              <div className="text-xs text-slate-500">{funded} funded / {total} total</div>
-            </div>
-            {/* Card grid */}
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-              {challenges.map((c) => {
-                const a = approvals[c.id];
-                const needed = actionNeeded(c, a);
-                return (
-                  <button
-                    key={c.id}
-                    onClick={() => setSelected(c)}
-                    className="group text-left overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition"
-                  >
-                    <div className="relative h-40 w-full overflow-hidden">
-                      <img src={c.data.image} alt={c.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                      <div className="absolute bottom-3 left-3 right-3">
-                        <h3 className="text-white font-semibold text-base line-clamp-1">{c.title}</h3>
-                      </div>
-                    </div>
-                    <div className="p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          {c.sponsorMeta.logo && (
-                            <img src={c.sponsorMeta.logo} alt={c.sponsorMeta.name} className="h-6 w-6 rounded-full object-cover border border-white/20" />
-                          )}
-                          <div className="text-xs text-slate-600 dark:text-slate-300">{c.sponsorMeta.name}</div>
-                        </div>
-                        <span className={
-                          "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium " +
-                          (c.isFunded ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700")
-                        }>
-                          {c.isFunded ? "Funded" : "Pending"}
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Modal: Challenge quick view */}
-            {selected && (
-              <div className="fixed inset-0 z-50">
-                <div className="absolute inset-0 bg-black/50" onClick={() => setSelected(null)} />
-                <div className="absolute inset-0 p-4 sm:p-6 flex items-center justify-center">
-                  <div className="w-full max-w-lg rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl overflow-hidden">
-                    <div className="relative h-44 w-full">
-                      <img src={selected.data.image} alt={selected.title} className="h-full w-full object-cover" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                      <button className="absolute top-3 right-3 rounded-full bg-black/50 text-white w-7 h-7" onClick={() => setSelected(null)}>×</button>
-                    </div>
-                    <div className="p-4">
-                      <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{selected.title}</h3>
-                      <div className="mt-1 text-xs text-slate-500">Challenge #{selected.id} • Prize: {selected.totalPrize} • Token: {selected.isERC20 ? selected.token : 'ETH'}</div>
-                      <p className="mt-3 text-sm text-slate-700 dark:text-slate-300">{selected.data.details}</p>
-
-                      <div className="mt-4 flex items-center justify-between">
-                        <a href={selected.sponsorMeta.link} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-primary-700 dark:text-primary-300">
-                          {selected.sponsorMeta.logo && <img src={selected.sponsorMeta.logo} alt={selected.sponsorMeta.name} className="h-6 w-6 rounded-full object-cover" />}
-                          <span>{selected.sponsorMeta.name}</span>
-                        </a>
-                        <div className="flex items-center gap-2">
-                          {!selected.isFunded && (
-                            <button className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs" onClick={() => alert('Sponsor fund flow (UI)')}>Fund</button>
-                          )}
-                          {selected.isFunded && (
-                            <>
-                              <button className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs" onClick={() => openWinners(selected)}>Add Winners</button>
-                              {!approvals[selected.id]?.organiserApproved && (
-                                <button className="rounded-lg bg-primary-600 text-white px-3 py-1.5 text-xs" onClick={() => approveDistribution(selected.id, 'organiser')}>Approve (Org)</button>
-                              )}
-                              {!approvals[selected.id]?.sponsorApproved && (
-                                <button className="rounded-lg bg-primary-600 text-white px-3 py-1.5 text-xs" onClick={() => approveDistribution(selected.id, 'sponsor')}>Approve (Sponsor)</button>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Modal: Add Winners */}
-            {winnersTarget && (
-              <div className="fixed inset-0 z-50">
-                <div className="absolute inset-0 bg-black/50" onClick={() => setWinnersTarget(null)} />
-                <div className="absolute inset-0 p-4 sm:p-6 flex items-center justify-center">
-                  <div className="w-full max-w-xl rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl overflow-hidden">
-                    <div className="p-4 sm:p-5">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Add Winners</h3>
-                          <div className="mt-1 text-xs text-slate-500">
-                            Challenge #{winnersTarget.id} • Total Prize: {winnersTarget.totalPrize} {winnersTarget.isERC20 ? '' : 'ETH'}
-                          </div>
-                        </div>
-                        <button className="rounded-full bg-slate-100 dark:bg-slate-800 w-7 h-7" onClick={() => setWinnersTarget(null)}>×</button>
-                      </div>
-
-                      <div className="mt-4 space-y-3">
-                        {winnersRows.map((row, idx) => (
-                          <div key={idx} className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              value={row.address}
-                              onChange={(e) => {
-                                const v = e.target.value;
-                                setWinnersRows((prev) => prev.map((r, i) => i === idx ? { ...r, address: v } : r));
-                              }}
-                              placeholder="0xWinnerAddress"
-                              className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm"
-                            />
-                            <input
-                              type="text"
-                              value={row.amount}
-                              onChange={(e) => {
-                                const v = e.target.value;
-                                setWinnersRows((prev) => prev.map((r, i) => i === idx ? { ...r, amount: v } : r));
-                              }}
-                              placeholder="Amount"
-                              className="w-32 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-right"
-                            />
-                            <button
-                              aria-label="Remove row"
-                              className="rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-2 text-xs"
-                              onClick={() => setWinnersRows((prev) => prev.filter((_, i) => i !== idx))}
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        ))}
-
-                        <div>
-                          <button
-                            className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs"
-                            onClick={() => setWinnersRows((prev) => [...prev, { address: "", amount: "" }])}
-                          >
-                            + Add another winner
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 flex items-center justify-between text-sm">
-                        <div className="text-slate-600 dark:text-slate-300">
-                          Total entered: {winnersTotal} / {totalPrizeNumber(winnersTarget)}
-                        </div>
-                        <div className={winnersValid ? "text-green-600" : "text-amber-600"}>
-                          {winnersValid ? "Ready to submit" : "Ensure totals equal prize and fields are valid"}
-                        </div>
-                      </div>
-
-                      {winnersError && (
-                        <div className="mt-2 text-xs text-red-600">{winnersError}</div>
-                      )}
-
-                      <div className="mt-5 flex items-center justify-end gap-2">
-                        <button
-                          className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs"
-                          onClick={() => setWinnersTarget(null)}
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          className="rounded-lg bg-primary-600 text-white px-3 py-1.5 text-xs disabled:opacity-50"
-                          disabled={!winnersValid}
-                          onClick={() => {
-                            if (!winnersValid) {
-                              setWinnersError('Please fix validation errors.');
-                              return;
-                            }
-                            // In a future iteration this would call the distribution proposal flow.
-                            console.log('submitWinners', { challengeId: winnersTarget.id, rows: winnersRows });
-                            alert('Winners submitted (demo)');
-                            setWinnersTarget(null);
-                          }}
-                        >
-                          Submit
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </section>
+          {winnersTarget && (
+            <WinnersModal
+              target={winnersTarget}
+              rows={winnersRows}
+              onChangeRow={(index, row) => setWinnersRows(prev => prev.map((r, i) => i === index ? row : r))}
+              onAddRow={() => setWinnersRows(prev => [...prev, { address: "", amount: "" }])}
+              onRemoveRow={(index) => setWinnersRows(prev => prev.filter((_, i) => i !== index))}
+              winnersTotal={winnersTotal}
+              totalPrizeNumber={totalPrizeNumber}
+              winnersValid={winnersValid}
+              error={winnersError}
+              onClose={() => setWinnersTarget(null)}
+              onSubmit={() => {
+                if (!winnersValid || !winnersTarget) {
+                  setWinnersError('Please fix validation errors.');
+                  return;
+                }
+                console.log('submitWinners', { challengeId: winnersTarget.id, rows: winnersRows });
+                alert('Winners submitted (demo)');
+                setWinnersTarget(null);
+              }}
+            />
+          )}
         </div>
       </main>
     </div>
