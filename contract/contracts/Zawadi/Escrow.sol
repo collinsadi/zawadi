@@ -9,7 +9,7 @@ import "../Errors/EscrowErrors.sol";
 import "../Libraries/EscrowLib.sol";
 import "../Events/EscrowEvents.sol";
 
-contract Escrow {
+contract Escrow is ReentrancyGuard {
     // using safe ERC20 for IERC20 so we can use the safe transfer functions
     using SafeERC20 for IERC20;
 
@@ -20,7 +20,8 @@ contract Escrow {
 
     // mappings
     mapping(uint256 => EscrowLib.Challenge) public challenges;
-    mapping(address => EscrowLib.Allocation) public allocations;
+    // A user can win multiple challenges; index allocations by winner then challengeId
+    mapping(address => mapping(uint256 => EscrowLib.Allocation)) public allocations;
     mapping(uint256 => EscrowLib.Approval) public approvals;
     mapping(address => bool) public sponsors;
     address[] public whitelistedSponsors;
@@ -281,7 +282,7 @@ contract Escrow {
                 revert Escrow_InvalidAllocation();
             }
 
-            allocations[winner] = EscrowLib.Allocation({
+            allocations[winner][_challengeId] = EscrowLib.Allocation({
                 position: i + 1, // 1-based index
                 amount: amount,
                 winner: winner,
@@ -324,6 +325,45 @@ contract Escrow {
                 revert Escrow__OrganizerAlreadyApproved();
             approval.organiserApproved = true;
             emit DistributionApproved(_challengeId, msg.sender);
+        }
+    }
+
+    /**
+     * @notice Allows a winner to claim their allocation after approvals are complete
+     * @dev Uses nonReentrant guard; supports both ERC20 and native token payouts
+     */
+    function claimPayout(uint256 _challengeId) external nonReentrant challengeExists(_challengeId) {
+        EscrowLib.Allocation storage alloc = allocations[msg.sender][_challengeId];
+        if (alloc.winner != msg.sender) {
+            revert Escrow__UnauthorizedAccess();
+        }
+        if (alloc.claimed) {
+            revert Escrow__SponsorAlreadyApproved(); // reuse an error to indicate already claimed
+        }
+
+        uint256 challengeId = _challengeId;
+        EscrowLib.Challenge storage c = challenges[challengeId];
+        EscrowLib.Approval storage ap = approvals[challengeId];
+
+        // Both approvals must be completed
+        if (!ap.sponsorApproved || !ap.organiserApproved) {
+            revert Escrow__UnauthorizedAccess();
+        }
+
+        uint256 amount = alloc.amount;
+        if (amount == 0) {
+            revert Escrow__InvalidTokenOrPrize();
+        }
+
+        // Effects
+        alloc.claimed = true;
+
+        // Interactions
+        if (c.isERC20) {
+            IERC20(c.token).safeTransfer(msg.sender, amount);
+        } else {
+            (bool ok, ) = payable(msg.sender).call{value: amount}("");
+            require(ok, "ETH transfer failed");
         }
     }
 

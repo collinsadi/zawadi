@@ -8,6 +8,9 @@ import { getHackathonById as getHackathonOnChain } from "../../services/factoryS
 import { getPinataUrl } from "../../config/pinata";
 import { useAccount } from "wagmi";
 import { createEscrowService } from "../../services/escrowService";
+import { formatUnits } from "viem";
+import { readContract } from "wagmi/actions";
+import { config } from "../../config/wagmi";
 
 // Simple helpers
 const fmtDate = (iso?: string) => {
@@ -44,6 +47,9 @@ export default function HackathonDetails() {
   const [isSponsor, setIsSponsor] = useState(false);
   const [challenges, setChallenges] = useState<ChallengeCard[]>([]);
   const [loadingChallenges, setLoadingChallenges] = useState(false);
+  const [winnersMap, setWinnersMap] = useState<Record<number, { winners: Array<{ address: `0x${string}`; amount: bigint; position: number }>; decimals: number; approvals: { sponsorApproved: boolean; organiserApproved: boolean }; isERC20: boolean; tokenAddress?: string; tokenSymbol: string; title: string }>>({});
+  const [myAllocs, setMyAllocs] = useState<Record<number, { claimed: boolean; amount: bigint }>>({});
+  const [claiming, setClaiming] = useState<Record<number, boolean>>({});
 
   // Fetch IPFS data if not provided via navigation state
   useEffect(() => {
@@ -126,6 +132,91 @@ export default function HackathonDetails() {
     loadChallenges();
     return () => { cancelled = true; };
   }, [escrow, id]);
+
+  // Load winners for each challenge (latest WinnersAdded event), token decimals and approvals
+  useEffect(() => {
+    let cancelled = false;
+    async function loadWinners() {
+      if (!escrow || challenges.length === 0) return;
+      try {
+        const entries = await Promise.all(
+          challenges.map(async (c) => {
+            const cid = BigInt(c.id);
+            const [winners, decimals, approvals] = await Promise.all([
+              escrow.getWinnersForChallenge(cid).catch(() => [] as any),
+              escrow.challengeTokenDecimals(cid).catch(() => 18),
+              escrow.approvals(cid).catch(() => ({ sponsorApproved: false, organiserApproved: false })),
+            ]);
+            // Resolve token symbol for ERC20
+            let tokenSymbol = "ETH";
+            if (c.isERC20 && c.token) {
+              try {
+                const ERC20_SYMBOL_ABI = [{ name: "symbol", type: "function", stateMutability: "view", inputs: [], outputs: [{ type: "string", name: "" }] }] as const;
+                const sym = await readContract(config, { abi: ERC20_SYMBOL_ABI as any, address: c.token as any, functionName: "symbol", args: [] }) as unknown as string;
+                tokenSymbol = sym || "TOKEN";
+              } catch {
+                tokenSymbol = "TOKEN";
+              }
+            }
+            return [Number(c.id), { winners, decimals, approvals, isERC20: c.isERC20, tokenAddress: c.isERC20 ? c.token : undefined, tokenSymbol, title: c.title }] as const;
+          })
+        );
+        if (cancelled) return;
+        const map: Record<number, any> = {};
+        for (const [cidNum, data] of entries) map[cidNum] = data;
+        setWinnersMap(map);
+      } catch {}
+    }
+    loadWinners();
+    return () => { cancelled = true; };
+  }, [escrow, challenges]);
+
+  // Load connected winner allocation status for challenges with winners
+  useEffect(() => {
+    let cancelled = false;
+    async function loadMyAllocs() {
+      if (!escrow || !address) return;
+      const withWinners = Object.keys(winnersMap).map((k) => Number(k)).filter((cidNum) => (winnersMap[cidNum]?.winners?.length || 0) > 0);
+      if (withWinners.length === 0) return;
+      try {
+        const res = await Promise.all(
+          withWinners.map(async (cidNum) => {
+            const cid = BigInt(cidNum);
+            try {
+              const alloc = await escrow.allocations(address as any, cid);
+              return [cidNum, { claimed: !!alloc.claimed, amount: alloc.amount }] as const;
+            } catch {
+              return [cidNum, { claimed: false, amount: 0n }] as const;
+            }
+          })
+        );
+        if (cancelled) return;
+        const map: Record<number, { claimed: boolean; amount: bigint }> = {};
+        for (const [id, info] of res) map[id] = info;
+        setMyAllocs(map);
+      } catch {}
+    }
+    loadMyAllocs();
+    return () => { cancelled = true; };
+  }, [escrow, address, winnersMap]);
+
+  const onClaim = async (challengeId: number) => {
+    if (!escrow) return;
+    setClaiming((prev) => ({ ...prev, [challengeId]: true }));
+    try {
+      const { hash } = await escrow.claimPayout(BigInt(challengeId));
+      // Refresh my allocation for that challenge
+      try {
+        if (address) {
+          const alloc = await escrow.allocations(address as any, BigInt(challengeId));
+          setMyAllocs((prev) => ({ ...prev, [challengeId]: { claimed: !!alloc.claimed, amount: alloc.amount } }));
+        }
+      } catch {}
+      console.log('Claim submitted', hash);
+    } finally {
+      setClaiming((prev) => ({ ...prev, [challengeId]: false }));
+    }
+  };
 
   // Update sponsor flag when address or escrow changes
   useEffect(() => {
@@ -402,9 +493,54 @@ export default function HackathonDetails() {
             </div>
           )}
           {activeTab === "winners" && (
-            <div className="text-slate-700 dark:text-slate-300">
-              Winners will appear here after the hackathon concludes.
-            </div>
+            <section className="space-y-4">
+              {challenges.length === 0 && (
+                <div className="text-slate-500 text-sm">No challenges yet.</div>
+              )}
+              {challenges.map((c) => {
+                const key = Number(c.id);
+                const row = winnersMap[key];
+                const winners = row?.winners || [];
+                if (winners.length === 0) return null;
+                const approvals = row?.approvals || { sponsorApproved: false, organiserApproved: false };
+                const approvalsComplete = approvals.sponsorApproved && approvals.organiserApproved;
+                return (
+                  <div key={key} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">{c.title}</h3>
+                      <span className={"text-[10px] rounded-full px-2 py-0.5 " + (approvalsComplete ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-700")}>{approvalsComplete ? "Approvals complete" : "Approvals pending"}</span>
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {winners.map((w: { address: `0x${string}`; amount: bigint; position: number }) => {
+                        const isMe = address && String(address).toLowerCase() === String(w.address).toLowerCase();
+                        const my = myAllocs[key];
+                        const canClaim = !!isMe && approvalsComplete && my && !my.claimed && (my.amount ?? 0n) > 0n;
+                        return (
+                          <div key={`${key}-${w.address}-${w.position}`} className="rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+                            <div className="text-xs text-slate-500">Position #{w.position}</div>
+                            <div className="mt-1 text-sm font-medium break-all">{w.address}</div>
+                            <div className="mt-1 text-xs">Amount: {formatUnits(w.amount || 0n, Number(row?.decimals || 18))} {row?.tokenSymbol || (c.isERC20 ? "TOKEN" : "ETH")}</div>
+                            {isMe && (
+                              <div className="mt-2 flex items-center gap-2">
+                                {my?.claimed ? (
+                                  <span className="text-[10px] rounded-full px-2 py-0.5 bg-slate-100 text-slate-700">Claimed</span>
+                                ) : canClaim ? (
+                                  <button className="rounded-lg bg-primary-600 text-white px-3 py-1.5 text-xs disabled:opacity-60" onClick={() => onClaim(key)} disabled={!!claiming[key]}>
+                                    {claiming[key] ? "Claiming..." : "Claim Prize"}
+                                  </button>
+                                ) : (
+                                  <span className="text-[10px] text-slate-500">Not claimable yet</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </section>
           )}
         </section>
       </main>

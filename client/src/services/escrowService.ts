@@ -98,13 +98,17 @@ export function createEscrowService(address: Address) {
     return { sponsorApproved, organiserApproved };
   };
 
-  const allocations = (winner: Address) =>
-    readContract(config, {
-      abi: escrowAbi,
+  // New signature: allocations(address winner, uint256 challengeId) => Allocation
+  const allocations = async (winner: Address, challengeId: bigint): Promise<Allocation> => {
+    const fn = parseAbiItem("function allocations(address,uint256) view returns (uint256 position, uint256 amount, address winner, bool claimed, uint256 challenge)");
+    const res = await readContract(config, {
+      abi: [fn],
       address: escrowAddress,
       functionName: "allocations",
-      args: [winner],
-    }) as Promise<Allocation>;
+      args: [winner, challengeId],
+    });
+    return res as unknown as Allocation;
+  };
 
   // Direct read: enumerable whitelisted sponsors (if contract supports it)
   const getWhitelistedSponsors = () =>
@@ -316,6 +320,67 @@ export function createEscrowService(address: Address) {
     return { hash, receipt };
   };
 
+  // Winner claims their allocation payout.
+  const claimPayout = async (challengeId: bigint) => {
+    const fn = parseAbiItem("function claimPayout(uint256 _challengeId)");
+    const { request } = await simulateContract(config, {
+      abi: [fn],
+      address: escrowAddress,
+      functionName: "claimPayout",
+      args: [challengeId],
+    });
+    const hash = await writeContract(config, request);
+    const receipt = await waitForTransactionReceipt(config, { hash });
+    return { hash, receipt };
+  };
+
+  // Convenience helper for connected user
+  const allocationsForMe = (winner: Address, challengeId: bigint) => allocations(winner, challengeId);
+
+  // Helper to read token decimals for a challenge (native=18)
+  const challengeTokenDecimals = async (challengeId: bigint): Promise<number> => {
+    try {
+      const dec = await readContract(config, {
+        abi: escrowAbi,
+        address: escrowAddress,
+        functionName: "challengeTokenDecimals",
+        args: [challengeId],
+      }) as unknown as number | bigint;
+      return Number(dec);
+    } catch {
+      return 18;
+    }
+  };
+
+  // Winners list by reading WinnersAdded logs for a specific challenge
+  const getWinnersForChallenge = async (challengeId: bigint): Promise<Array<{ address: Address; amount: bigint; position: number }>> => {
+    try {
+      const publicClient = getPublicClient(config);
+      if (!publicClient) return [];
+      const event = parseAbiItem(
+        "event WinnersAdded(uint256 indexed challengeId, address[] winners, uint256[] allocations)"
+      );
+      const logs = await publicClient.getLogs({
+        address: escrowAddress,
+        event,
+        args: { challengeId },
+        fromBlock: 0n,
+      });
+      if (!logs || logs.length === 0) return [];
+      // Use the last WinnersAdded for this challenge as source of truth
+      const last = logs[logs.length - 1] as any;
+      const winners: Address[] = (last.args?.winners || []) as Address[];
+      const allocations: bigint[] = (last.args?.allocations || []) as bigint[];
+      const out: Array<{ address: Address; amount: bigint; position: number }> = [];
+      for (let i = 0; i < winners.length; i++) {
+        out.push({ address: winners[i], amount: allocations[i] || 0n, position: i + 1 });
+      }
+      return out;
+    } catch {
+      return [];
+    }
+  };
+
   const lockContract = async () => {
     const { request } = await simulateContract(config, {
       abi: escrowAbi,
@@ -352,6 +417,7 @@ export function createEscrowService(address: Address) {
     sponsors,
     approvals,
     allocations,
+    allocationsForMe,
     getWhitelistedSponsors,
     listWhitelistedSponsors,
     getAllChallenges,
@@ -362,6 +428,9 @@ export function createEscrowService(address: Address) {
     fundChallenge,
     addWinners,
     approveDistribution,
+    claimPayout,
+    challengeTokenDecimals,
+    getWinnersForChallenge,
     lockContract,
     unLockContract,
   };

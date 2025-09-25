@@ -71,6 +71,7 @@ export default function ChallengeDetails() {
     return () => { cancelled = true; };
   }, [id, challengeId]);
 
+
   const title = ipfs?.title || (challengeId ? `Challenge #${challengeId}` : "Challenge");
   const cover = ipfs?.data?.image || "";
   const details = ipfs?.data?.details || ipfs?.brief || "";
@@ -89,6 +90,8 @@ export default function ChallengeDetails() {
   const approvalsRequired = 2;
   const approvalsRemaining = Math.max(0, approvalsRequired - approvalsCompleted);
   const approvalsRemainingDisplay = approvals ? String(approvalsRemaining) : "—";
+
+  // No winners/claim UI here; see HackathonDetails winners tab
 
   const onFund = async () => {
     if (!escrow || !challengeId) return;
@@ -234,6 +237,8 @@ export default function ChallengeDetails() {
             </div>
           )}
         </div>
+
+        {/* Winners moved to HackathonDetails winners tab */}
 
         <div className="mt-6">
           <Link to={id ? `/hackathons/${id}` : "/"} className="text-sm text-primary-700 dark:text-primary-300">
