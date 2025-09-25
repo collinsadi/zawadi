@@ -1,18 +1,65 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Navbar from "../components/UI/Navbar";
 import HackathonCard from "../components/Hackathon/HackathonCard";
 import type { Hackathon } from "../types/Hackathon";
-import { hackathons } from "../data/hackathons";
 import { FiFilter } from "react-icons/fi";
+import { getAllHackathons as getAllHackathonsOnChain } from "../services/factoryService";
+import { getPinataUrl } from "../config/pinata";
 
 export default function HomePage() {
   const [showFilters, setShowFilters] = useState(false);
   const [typeFilter, setTypeFilter] = useState<"All" | "Online" | "In-person">("All");
+  const [items, setItems] = useState<Hackathon[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const onChain = await getAllHackathonsOnChain();
+        // Fetch IPFS JSON for each entry
+        const resolved: Hackathon[] = await Promise.all(
+          onChain.map(async (h) => {
+            try {
+              const url = getPinataUrl(h.ipfsCid);
+              const res = await fetch(url);
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              const data = (await res.json()) as Omit<Hackathon, "id">;
+              return { id: h.id as unknown as string, ...data } satisfies Hackathon;
+            } catch (e) {
+              // Fallback: minimal object with placeholder title
+              return {
+                id: h.id as unknown as string,
+                title: `Hackathon ${String(h.id)}`,
+                cover: "",
+                description: "",
+                details: { prizePool: "0", currency: "USD", startDate: "", endDate: "", location: "", tags: [] },
+                organiser: { name: "", logo: "", url: "" },
+                type: "Online",
+              } as Hackathon;
+            }
+          })
+        );
+        if (!cancelled) setItems(resolved);
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filtered = useMemo(() => {
-    if (typeFilter === "All") return hackathons;
-    return hackathons.filter((h) => h.type === typeFilter);
-  }, [typeFilter]);
+    if (typeFilter === "All") return items;
+    return items.filter((h) => h.type === typeFilter);
+  }, [typeFilter, items]);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -64,6 +111,12 @@ export default function HomePage() {
         </section>
 
         <section>
+          {loading && (
+            <div className="text-slate-600 dark:text-slate-300 mb-4">Loading hackathons...</div>
+          )}
+          {error && (
+            <div className="text-red-600 dark:text-red-400 mb-4">Failed to load hackathons: {error}</div>
+          )}
           <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((hack: Hackathon) => (
               <HackathonCard key={hack.id} hack={hack} />
