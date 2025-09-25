@@ -1,4 +1,3 @@
-import React from 'react';
 import type { EscrowChallenge, EscrowApproval } from './types';
 
 type Props = {

@@ -1,4 +1,3 @@
-import React from 'react';
 import type { EscrowChallenge } from './types';
 
 type Row = { address: string; amount: string };
