@@ -2,6 +2,7 @@
   "id": "string",
   "title": "string",
   "totalPrize": "string",
+  "brief": "string",
   "token": "string",
   "isErc20": "boolean",
   "data": {

@@ -17,3 +17,16 @@ export async function uploadHackathonJson(data: unknown): Promise<IpfsJsonRespon
   }
   return (await res.json()) as IpfsJsonResponse;
 }
+
+export async function uploadChallengeJson(data: unknown): Promise<IpfsJsonResponse> {
+  const res = await fetch(`${BASE_URL}/api/ipfs/json`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`IPFS upload failed: ${res.status} ${res.statusText} ${text}`);
+  }
+  return (await res.json()) as IpfsJsonResponse;
+}

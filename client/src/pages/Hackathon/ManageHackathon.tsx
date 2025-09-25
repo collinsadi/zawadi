@@ -1,5 +1,6 @@
+import { useAccount } from "wagmi";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import Navbar from "../../components/UI/Navbar";
 import WhitelistPanel from "../../components/ManageHackathon/WhitelistPanel";
 import ChallengesGrid from "../../components/ManageHackathon/ChallengesGrid";
@@ -61,12 +62,16 @@ const DEMO_APPROVALS: Record<number, EscrowApproval> = {
 export default function ManageHackathon() {
   const { id } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
+  const { address } = useAccount();
 
   const initial = (location.state as any) || {};
   const [organiser, setOrganiser] = useState<string>(initial.organiser || "");
   const [escrowAddr, setEscrowAddr] = useState<string>(initial.escrow || "");
   const [escrow, setEscrow] = useState<ReturnType<typeof createEscrowService> | null>(null);
   const [loadingEscrow, setLoadingEscrow] = useState<boolean>(false);
+  const [checkingSponsor, setCheckingSponsor] = useState<boolean>(false);
+  const [isSponsor, setIsSponsor] = useState<boolean>(false);
 
   // Whitelist state (UI-only for now)
   const [whitelist, setWhitelist] = useState<string[]>(
@@ -132,6 +137,41 @@ export default function ManageHackathon() {
     verifyList();
     return () => { cancelled = true; };
   }, [escrow]);
+
+  // Check if connected wallet is whitelisted sponsor
+  useEffect(() => {
+    let cancelled = false;
+    async function check() {
+      if (!escrow || !address) {
+        setIsSponsor(false);
+        return;
+      }
+      setCheckingSponsor(true);
+      try {
+        const ok = await escrow.sponsors(address as any).catch(() => false);
+        if (!cancelled) setIsSponsor(!!ok);
+      } finally {
+        if (!cancelled) setCheckingSponsor(false);
+      }
+    }
+    check();
+    return () => { cancelled = true; };
+  }, [escrow, address]);
+
+  const isOrganizer = useMemo(() => {
+    if (!organiser || !address) return false;
+    return organiser.toLowerCase() === address.toLowerCase();
+  }, [organiser, address]);
+
+  // Route guard: only organizer or sponsor can access
+  useEffect(() => {
+    if (loadingEscrow || checkingSponsor) return;
+    if (!id) return;
+    const authorized = isOrganizer || isSponsor;
+    if (!authorized) {
+      navigate(`/hackathons/${id}`, { replace: true });
+    }
+  }, [id, isOrganizer, isSponsor, loadingEscrow, checkingSponsor, navigate]);
 
   // Load full on-chain whitelist list (enumerable getter, with logs fallback)
   useEffect(() => {

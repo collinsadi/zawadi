@@ -7,6 +7,7 @@ import ChallengeCards, { type ChallengeCard } from "../../components/Challenge/C
 import { getHackathonById as getHackathonOnChain } from "../../services/factoryService";
 import { getPinataUrl } from "../../config/pinata";
 import { useAccount } from "wagmi";
+import { createEscrowService } from "../../services/escrowService";
 
 // Simple helpers
 const fmtDate = (iso?: string) => {
@@ -39,6 +40,8 @@ export default function HackathonDetails() {
   const [error, setError] = useState<string | null>(null);
   const [organizer, setOrganizer] = useState<string | null>(null);
   const { address } = useAccount();
+  const [escrow, setEscrow] = useState<ReturnType<typeof createEscrowService> | null>(null);
+  const [isSponsor, setIsSponsor] = useState(false);
 
   // Fetch IPFS data if not provided via navigation state
   useEffect(() => {
@@ -50,6 +53,8 @@ export default function HackathonDetails() {
       try {
         const onChain = await getHackathonOnChain(id as any);
         setOrganizer(onChain.organizer as unknown as string);
+        const escrowAddr = onChain.escrowContract as unknown as string;
+        setEscrow(createEscrowService(escrowAddr as any));
         const url = getPinataUrl(onChain.ipfsCid);
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -66,6 +71,22 @@ export default function HackathonDetails() {
       cancelled = true;
     };
   }, [id]);
+
+  // Update sponsor flag when address or escrow changes
+  useEffect(() => {
+    let cancelled = false;
+    async function checkSponsor() {
+      if (!escrow || !address) return setIsSponsor(false);
+      try {
+        const ok = await escrow.sponsors(address as any).catch(() => false);
+        if (!cancelled) setIsSponsor(!!ok);
+      } catch {
+        if (!cancelled) setIsSponsor(false);
+      }
+    }
+    checkSponsor();
+    return () => { cancelled = true; };
+  }, [escrow, address]);
 
   // Always fetch organizer address from on-chain to gate Manage button
   useEffect(() => {
@@ -280,6 +301,14 @@ export default function HackathonDetails() {
                   className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-700"
                 >
                   Manage
+                </Link>
+              )}
+              {!loading && hackathon && isSponsor && (
+                <Link
+                  to={`/hackathons/${id}/add-challenge`}
+                  className="inline-flex items-center gap-2 rounded-xl border border-primary-600 text-primary-700 dark:text-primary-300 px-3.5 py-2.5 text-sm font-semibold hover:bg-primary-50 dark:hover:bg-slate-800"
+                >
+                  Add Challenge
                 </Link>
               )}
             </div>
