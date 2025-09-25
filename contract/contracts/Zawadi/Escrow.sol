@@ -22,6 +22,7 @@ contract Escrow {
     mapping(address => EscrowLib.Allocation) public allocations;
     mapping(uint256 => EscrowLib.Approval) public approvals;
     mapping(address => bool) public sponsors;
+    address[] public whitelistedSponsors;
 
     // modifiers
     modifier onlyOrganizer() {
@@ -72,7 +73,15 @@ contract Escrow {
     function whitelistSponsor(address _sponsor) external onlyOrganizer {
         if (sponsors[_sponsor]) revert Escrow__SponsorAlreadyWhitelisted();
         sponsors[_sponsor] = true;
+        whitelistedSponsors.push(_sponsor);
         emit SponsorWhitelisted(_sponsor);
+    }
+
+    /**
+     * @notice Returns the full list of whitelisted sponsor addresses
+     */
+    function getWhitelistedSponsors() external view returns (address[] memory) {
+        return whitelistedSponsors;
     }
 
     /**

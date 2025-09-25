@@ -133,6 +133,30 @@ export default function ManageHackathon() {
     return () => { cancelled = true; };
   }, [escrow]);
 
+  // Load full on-chain whitelist list (enumerable getter, with logs fallback)
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchWhitelist() {
+      if (!escrow) return;
+      try {
+        let list: string[] = [];
+        try {
+          list = await escrow.getWhitelistedSponsors();
+        } catch {
+          // fallback to logs enumeration
+          list = await escrow.listWhitelistedSponsors();
+        }
+        // Ensure uniqueness and newest first
+        const unique = Array.from(new Set(list)).reverse();
+        if (!cancelled) setWhitelist(unique);
+      } catch (e) {
+        // non-fatal: leave current UI list
+      }
+    }
+    fetchWhitelist();
+    return () => { cancelled = true; };
+  }, [escrow]);
+
   // Handlers
   const addSponsor = async () => {
     const addr = newSponsor.trim();
@@ -226,9 +250,9 @@ export default function ManageHackathon() {
             >
               View public page
             </Link>
-            {escrowAddr && (
+            {/* {escrowAddr && (
               <span className="text-[10px] text-slate-500">Escrow: {escrowAddr}</span>
-            )}
+            )} */}
           </div>
         </div>
 
