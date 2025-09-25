@@ -3,6 +3,7 @@ import Home from "../pages/Home";
 import CreateHackathon from "../pages/Hackathon/CreateHackathon";
 import HackathonDetails from "../pages/Hackathon/HackathonDetails";
 import ManageHackathon from "../pages/Hackathon/ManageHackathon";
+import WalletGuard from "./WalletGuard";
 
 const AppRoutes = () => {
   return (
@@ -10,9 +11,23 @@ const AppRoutes = () => {
       <Routes>
         {/* Active Routes */}
         <Route path="/" element={<Home />} />
-        <Route path="/hackathons/new" element={<CreateHackathon />} />
+        <Route
+          path="/hackathons/new"
+          element={
+            <WalletGuard>
+              <CreateHackathon />
+            </WalletGuard>
+          }
+        />
         <Route path="/hackathons/:id" element={<HackathonDetails />} />
-        <Route path="/hackathons/:id/manage" element={<ManageHackathon />} />
+        <Route
+          path="/hackathons/:id/manage"
+          element={
+            <WalletGuard>
+              <ManageHackathon />
+            </WalletGuard>
+          }
+        />
 
         <Route path="*" element={"Not Found"} />
       </Routes>

@@ -2,8 +2,11 @@ import { Link, NavLink } from "react-router-dom";
 import { FiPlusCircle, FiSearch } from "react-icons/fi";
 import ThemeToggle from "./ThemeToggle";
 import { GiAchievement } from "react-icons/gi";
+import { useAccount } from "wagmi";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
 
 export default function Navbar() {
+  const { isConnected } = useAccount();
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200/60 bg-white/80 dark:bg-slate-900/70 dark:border-slate-800 backdrop-blur">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -28,16 +31,21 @@ export default function Navbar() {
 
           <nav className="flex items-center gap-2">
             <ThemeToggle />
-            <NavLink
-              to="/hackathons/new"
-              className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-700 transition-colors"
-            >
-              <FiPlusCircle className="text-white" />
-              Create Hackathon
-            </NavLink>
+            {isConnected ? (
+              <NavLink
+                to="/hackathons/new"
+                className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-700 transition-colors"
+              >
+                <FiPlusCircle className="text-white" />
+                Create Hackathon
+              </NavLink>
+            ) : (
+              <ConnectButton chainStatus="icon" showBalance={false} />
+            )}
           </nav>
         </div>
       </div>
     </header>
   );
 }
+
