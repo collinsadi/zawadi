@@ -42,6 +42,8 @@ export default function HackathonDetails() {
   const { address } = useAccount();
   const [escrow, setEscrow] = useState<ReturnType<typeof createEscrowService> | null>(null);
   const [isSponsor, setIsSponsor] = useState(false);
+  const [challenges, setChallenges] = useState<ChallengeCard[]>([]);
+  const [loadingChallenges, setLoadingChallenges] = useState(false);
 
   // Fetch IPFS data if not provided via navigation state
   useEffect(() => {
@@ -71,6 +73,59 @@ export default function HackathonDetails() {
       cancelled = true;
     };
   }, [id]);
+
+  // Fetch challenges from escrow + IPFS
+  useEffect(() => {
+    let cancelled = false;
+    async function loadChallenges() {
+      if (!escrow || !id) return;
+      setLoadingChallenges(true);
+      try {
+        const all = await escrow.getAllChallenges();
+        const cards: ChallengeCard[] = await Promise.all(
+          all.map(async (row) => {
+            const onChain = row.data;
+            const cid = onChain.ipfsCid;
+            let ipfs: any = {};
+            try {
+              const res = await fetch(getPinataUrl(cid));
+              if (res.ok) ipfs = await res.json();
+            } catch {}
+            const title = ipfs?.title || `Challenge #${row.id}`;
+            const totalPrize = ipfs?.totalPrize || String(onChain.totalPrize);
+            const isERC20 = !!onChain.isERC20;
+            const token = isERC20 ? (onChain.token as any as string) : "ETH";
+            const data = {
+              image: ipfs?.data?.image || "",
+              details: ipfs?.data?.details || ipfs?.brief || "",
+            };
+            const sponsorMeta = {
+              link: ipfs?.sponsor?.link || "",
+              name: ipfs?.sponsor?.name || String(onChain.sponsor),
+              logo: ipfs?.sponsor?.logo || "",
+            };
+            return {
+              id: Number(row.id),
+              title,
+              totalPrize,
+              token,
+              isERC20,
+              isFunded: !!onChain.isFunded,
+              data,
+              sponsorMeta,
+            } as ChallengeCard;
+          })
+        );
+        if (!cancelled) setChallenges(cards);
+      } catch (e) {
+        // non-fatal, leave empty
+      } finally {
+        if (!cancelled) setLoadingChallenges(false);
+      }
+    }
+    loadChallenges();
+    return () => { cancelled = true; };
+  }, [escrow, id]);
 
   // Update sponsor flag when address or escrow changes
   useEffect(() => {
@@ -142,43 +197,7 @@ export default function HackathonDetails() {
     return `${start} - ${end}`;
   }, [hackathon?.details.startDate, hackathon?.details.endDate]);
 
-  // Demo challenges (replace with IPFS/contract fetched data later)
-  const demoChallenges: ChallengeCard[] = [
-    {
-      id: 0,
-      title: "Best DeFi Tooling",
-      totalPrize: "200,000",
-      token: "ETH",
-      isERC20: false,
-      isFunded: true,
-      data: {
-        image: "https://images.unsplash.com/photo-1508385082359-f38ae991e8f2?w=1200&auto=format&fit=crop&q=60",
-        details: "Build tooling that improves developer UX for DeFi protocols.",
-      },
-      sponsorMeta: {
-        link: "https://example.com",
-        name: "BAM",
-        logo: "https://res.cloudinary.com/demo/image/upload/w_120,h_120,c_thumb,g_face,r_max/flower.jpg",
-      },
-    },
-    {
-      id: 1,
-      title: "AI + ZK Privacy",
-      totalPrize: "300,000",
-      token: "USDC",
-      isERC20: true,
-      isFunded: false,
-      data: {
-        image: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&auto=format&fit=crop&q=60",
-        details: "Demonstrate private inference using ZK proofs.",
-      },
-      sponsorMeta: {
-        link: "https://example.org",
-        name: "ACME Labs",
-        logo: "https://avatars.githubusercontent.com/u/9919?s=200&v=4",
-      },
-    },
-  ];
+  const buildViewLink = (c: ChallengeCard) => `/hackathons/${id}/challenges/${c.id}`;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -356,7 +375,18 @@ export default function HackathonDetails() {
         {/* Tab content */}
         <section className="pt-6">
           {activeTab === "challenges" && (
-            <ChallengeCards items={demoChallenges} />
+            <>
+              {loadingChallenges && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="h-64 rounded-2xl bg-slate-200 dark:bg-slate-800 animate-pulse" />
+                  ))}
+                </div>
+              )}
+              {!loadingChallenges && (
+                <ChallengeCards items={challenges} buildViewLink={buildViewLink} />
+              )}
+            </>
           )}
           {activeTab === "details" && (
             <div data-color-mode={mdTheme} className="prose max-w-none dark:prose-invert prose-slate bg-transparent">

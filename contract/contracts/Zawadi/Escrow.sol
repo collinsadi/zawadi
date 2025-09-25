@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../Errors/EscrowErrors.sol";
@@ -184,6 +185,21 @@ contract Escrow {
     {
         challenge = challenges[_challengeId];
         return challenge;
+    }
+
+    /**
+     * @notice Returns token decimals for a given challenge.
+     * @dev For native token challenges (isERC20 == false), returns 18.
+     */
+    function challengeTokenDecimals(uint256 _challengeId)
+        external
+        view
+        challengeExists(_challengeId)
+        returns (uint8)
+    {
+        EscrowLib.Challenge storage c = challenges[_challengeId];
+        if (!c.isERC20) return 18; 
+        return IERC20Metadata(c.token).decimals();
     }
 
     /**

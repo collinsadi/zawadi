@@ -4,6 +4,7 @@ import CreateHackathon from "../pages/Hackathon/CreateHackathon";
 import HackathonDetails from "../pages/Hackathon/HackathonDetails";
 import AddChallenge from "../pages/Hackathon/AddChallenge";
 import ManageHackathon from "../pages/Hackathon/ManageHackathon";
+import ChallengeDetails from "../pages/Hackathon/ChallengeDetails";
 import WalletGuard from "./WalletGuard";
 
 const AppRoutes = () => {
@@ -21,6 +22,7 @@ const AppRoutes = () => {
           }
         />
         <Route path="/hackathons/:id" element={<HackathonDetails />} />
+        <Route path="/hackathons/:id/challenges/:challengeId" element={<ChallengeDetails />} />
         <Route
           path="/hackathons/:id/add-challenge"
           element={

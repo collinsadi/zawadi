@@ -22,9 +22,10 @@ type Props = {
   items: ChallengeCard[];
   showStatus?: boolean; // show funded/pending badge
   onSelect?: (item: ChallengeCard) => void; // optional external selection handler
+  buildViewLink?: (item: ChallengeCard) => string; // optional builder for "View more" link
 };
 
-export default function ChallengeCards({ items, showStatus = true, onSelect }: Props) {
+export default function ChallengeCards({ items, showStatus = true, onSelect, buildViewLink }: Props) {
   const [selected, setSelected] = useState<ChallengeCard | null>(null);
 
   const open = (item: ChallengeCard) => {
@@ -73,6 +74,20 @@ export default function ChallengeCards({ items, showStatus = true, onSelect }: P
                   </span>
                 )}
               </div>
+            </div>
+            <div className="px-3 pb-3 flex items-center justify-between">
+              {buildViewLink ? (
+                <a
+                  href={buildViewLink(c)}
+                  className="rounded-lg bg-primary-600 text-white px-3 py-1.5 text-xs font-medium"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  View more
+                </a>
+              ) : (
+                <span />
+              )}
+              {/* spacer for potential actions */}
             </div>
           </button>
         ))}

@@ -12,52 +12,7 @@ import { createEscrowService } from "../../services/escrowService";
 import ResultModal from "../../components/UI/ResultModal";
 import { isAddress } from "viem";
 
-// Demo data if none passed via navigation
-const DEMO_CHALLENGES: EscrowChallenge[] = [
-  {
-    id: 0,
-    title: "Best DeFi Tooling",
-    totalPrize: "200,000",
-    token: "ETH",
-    isERC20: false,
-    ipfsCid: "bafy...abc",
-    isFunded: true,
-    sponsor: "0xSponsor...1234",
-    data: {
-      image: "https://images.unsplash.com/photo-1508385082359-f38ae991e8f2?w=1200&auto=format&fit=crop&q=60",
-      details: "Build tooling that improves developer UX for DeFi protocols. Markdown supported.",
-    },
-    sponsorMeta: {
-      link: "https://example.com",
-      name: "BAM",
-      logo: "https://res.cloudinary.com/demo/image/upload/w_120,h_120,c_thumb,g_face,r_max/flower.jpg",
-    },
-  },
-  {
-    id: 1,
-    title: "AI + ZK Privacy",
-    totalPrize: "300,000",
-    token: "0xToken...ABCD",
-    isERC20: true,
-    ipfsCid: "bafy...xyz",
-    isFunded: false,
-    sponsor: "0xSponsor...5678",
-    data: {
-      image: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&auto=format&fit=crop&q=60",
-      details: "Demonstrate private inference using ZK proofs.",
-    },
-    sponsorMeta: {
-      link: "https://example.org",
-      name: "ACME Labs",
-      logo: "https://avatars.githubusercontent.com/u/9919?s=200&v=4",
-    },
-  },
-];
-
-const DEMO_APPROVALS: Record<number, EscrowApproval> = {
-  0: { sponsorApproved: false, organiserApproved: false },
-  1: { sponsorApproved: false, organiserApproved: false },
-};
+import { getPinataUrl } from "../../config/pinata";
 
 export default function ManageHackathon() {
   const { id } = useParams();
@@ -83,9 +38,9 @@ export default function ManageHackathon() {
   const [errorOpen, setErrorOpen] = useState(false);
   const [modalMsg, setModalMsg] = useState<string>("");
 
-  // Challenges and approvals (UI-only for now)
-  const [challenges] = useState<EscrowChallenge[]>(initial.challenges || DEMO_CHALLENGES);
-  const [approvals, setApprovals] = useState<Record<number, EscrowApproval>>(initial.approvals || DEMO_APPROVALS);
+  // Challenges and approvals
+  const [challenges, setChallenges] = useState<EscrowChallenge[]>(initial.challenges || []);
+  const [approvals, setApprovals] = useState<Record<number, EscrowApproval>>(initial.approvals || {});
 
   const fundedChallenges = useMemo(() => challenges.filter((c) => c.isFunded), [challenges]);
   const [selected, setSelected] = useState<EscrowChallenge | null>(null);

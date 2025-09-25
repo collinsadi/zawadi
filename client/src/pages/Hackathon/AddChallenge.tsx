@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import Navbar from "../../components/UI/Navbar";
 import ImageUpload from "../../components/CreateHackathon/ImageUpload";
 import MarkdownField from "../../components/CreateHackathon/MarkdownField";
@@ -8,6 +8,10 @@ import { uploadChallengeJson } from "../../services/ipfsService";
 import { getHackathonById as getHackathonOnChain } from "../../services/factoryService";
 import { createEscrowService } from "../../services/escrowService";
 import { useAccount } from "wagmi";
+import { isAddress, parseUnits } from "viem";
+import { readContract } from "wagmi/actions";
+import { config } from "../../config/wagmi";
+import { parseAbiItem } from "viem";
 import type { Address } from "viem";
 
 // Spec reference: specs/Challenge.json
@@ -37,7 +41,6 @@ type ChallengeForm = {
 export default function AddChallengePage() {
   const { id } = useParams(); // hackathon id
   const navigate = useNavigate();
-  const location = useLocation();
   const { address } = useAccount();
 
   const [step, setStep] = useState<Step>(1);
@@ -69,7 +72,9 @@ export default function AddChallengePage() {
       return form.sponsor.name.trim() && form.sponsor.logo.trim() && form.sponsor.link.trim() && form.data.details.trim();
     }
     if (step === 3) {
-      return form.totalPrize.trim() && form.token.trim();
+      if (!form.totalPrize.trim()) return false;
+      if (form.isErc20) return isAddress(form.token as Address);
+      return true; // native token
     }
     return false;
   }, [form, step]);
@@ -118,6 +123,19 @@ export default function AddChallengePage() {
     }
     setSubmitting(true);
     try {
+      // Determine decimals and convert human amount to base units
+      let decimals = 18;
+      let tokenAddr: Address = "0x0000000000000000000000000000000000000000" as Address;
+      if (form.isErc20) {
+        if (!isAddress(form.token as Address)) {
+          throw new Error("Invalid ERC20 token address.");
+        }
+        tokenAddr = form.token as Address;
+        const abi = [parseAbiItem("function decimals() view returns (uint8)")];
+        decimals = (await readContract(config, { abi, address: tokenAddr, functionName: "decimals" })) as number;
+      }
+      const total = parseUnits(form.totalPrize, decimals);
+
       const payload = {
         // No id here; will be implicit by on-chain challengeCount
         title: form.title,
@@ -132,9 +150,6 @@ export default function AddChallengePage() {
 
       // Call escrow.addChallenge(totalPrize, token, isERC20, ipfsCid)
       const esc = createEscrowService(escrowAddr);
-      // NOTE: totalPrize must be in base units (wei). Expect user to input raw integer; else we could add parsing.
-      const total = BigInt(form.totalPrize);
-      const tokenAddr = (form.isErc20 ? (form.token as Address) : ("0x0000000000000000000000000000000000000000" as Address));
       const { hash } = await esc.addChallenge(total, tokenAddr, form.isErc20, cid);
 
       setModalMsg(`Challenge added. CID: ${cid}\nTx: ${hash}`);

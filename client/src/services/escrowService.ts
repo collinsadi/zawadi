@@ -120,6 +120,35 @@ export function createEscrowService(address: Address) {
     return unique.reverse();
   };
 
+  // Challenges helpers
+  type ChallengeWithId = { id: bigint; data: Challenge };
+
+  const getAllChallenges = async (): Promise<ChallengeWithId[]> => {
+    const total = await challengeCount().catch(() => 0n);
+    const ids = Array.from({ length: Number(total) }, (_, i) => BigInt(i));
+    const results = await Promise.all(
+      ids.map(async (id) => ({ id, data: await getChallenge(id).catch(() => ({} as any)) }))
+    );
+    return results.filter((r) => r.data && typeof r.data.ipfsCid === 'string');
+  };
+
+  const hasWinners = async (challengeId: bigint): Promise<boolean> => {
+    try {
+      const publicClient = getPublicClient(config);
+      if (!publicClient) return false;
+      const event = parseAbiItem('event WinnersAdded(uint256 indexed challengeId, address[] winners, uint256[] allocations)');
+      const logs = await publicClient.getLogs({
+        address: escrowAddress,
+        event,
+        args: { challengeId },
+        fromBlock: 0n,
+      });
+      return logs.length > 0;
+    } catch {
+      return false;
+    }
+  };
+
   // Writes
   const whitelistSponsor = async (sponsorAddr: Address) => {
     const { request } = await simulateContract(config, {
@@ -231,6 +260,8 @@ export function createEscrowService(address: Address) {
     allocations,
     getWhitelistedSponsors,
     listWhitelistedSponsors,
+    getAllChallenges,
+    hasWinners,
     // writes
     whitelistSponsor,
     addChallenge,
