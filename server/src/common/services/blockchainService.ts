@@ -54,21 +54,21 @@ export function startFactoryEventListener() {
     provider = new WebSocketProvider(websocketUrl, chainId);
     factoryContract = new Contract(contractAddress, FACTORY_MINIMAL_ABI, provider);
 
-    // Add WebSocket connection event handlers using provider events
-    provider.on('connect', () => {
-      logger.info('WebSocket connection opened', { websocketUrl });
+    // Ethers v6 Provider events: use 'network' and 'block'
+    provider.on('network', (network, oldNetwork) => {
+      if (oldNetwork) {
+        logger.info('WebSocket network changed', { from: oldNetwork.chainId, to: network.chainId, websocketUrl });
+      } else {
+        logger.info('WebSocket network connected', { chainId: network.chainId, websocketUrl });
+      }
     });
 
-    provider.on('error', (error: Error) => {
-      logger.error('WebSocket connection error', { error: error.message, websocketUrl });
-    });
-
-    provider.on('disconnect', (error?: Error) => {
-      logger.warn('WebSocket connection closed', { 
-        error: error?.message, 
-        websocketUrl 
-      });
-      listenerAttached = false;
+    // Optionally log blocks to confirm liveness (throttled by default provider)
+    provider.on('block', (blockNumber: number) => {
+      // Keep lightweight to avoid noisy logs
+      if (blockNumber % 100 === 0) {
+        logger.info('WebSocket new block', { blockNumber });
+      }
     });
 
     factoryContract.on(

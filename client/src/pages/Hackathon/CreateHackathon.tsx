@@ -5,6 +5,7 @@ import OrganizerStep from '../../components/CreateHackathon/OrganizerStep';
 import HackathonStep from '../../components/CreateHackathon/HackathonStep';
 import DetailsStep from '../../components/CreateHackathon/DetailsStep';
 import { uploadHackathonJson } from '../../services/ipfsService';
+import { createHackathon as createHackathonOnChain } from '../../services/factoryService';
 
 type Step = 1 | 2 | 3;
 
@@ -74,7 +75,11 @@ export default function CreateHackathonPage() {
       // Upload to IPFS via server route (Pinata)
       const { cid } = await uploadHackathonJson(payload);
       console.log('IPFS CID:', cid);
-      alert(`Hackathon uploaded to IPFS. CID: ${cid}`);
+      // Interact with Factory contract to create hackathon
+      const { hash, receipt } = await createHackathonOnChain(cid);
+      console.log('Factory createHackathon tx hash:', hash);
+      console.log('Tx receipt:', receipt);
+      alert(`Hackathon created on-chain.\nCID: ${cid}\nTx: ${hash}`);
     } finally {
       setSubmitting(false);
     }
