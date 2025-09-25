@@ -5,9 +5,15 @@ import MarkdownPreview from "@uiw/react-markdown-preview";
 import { getHackathonById as getHackathonOnChain } from "../../services/factoryService";
 import { createEscrowService } from "../../services/escrowService";
 import { getPinataUrl } from "../../config/pinata";
+import { useAccount } from "wagmi";
+import { simulateContract, writeContract, waitForTransactionReceipt } from "wagmi/actions";
+import { parseAbiItem } from "viem";
+import { config } from "../../config/wagmi";
+import ResultModal from "../../components/UI/ResultModal";
 
 export default function ChallengeDetails() {
   const { id, challengeId } = useParams();
+  const { address } = useAccount();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [escrow, setEscrow] = useState<ReturnType<typeof createEscrowService> | null>(null);
@@ -15,6 +21,10 @@ export default function ChallengeDetails() {
   const [ipfs, setIpfs] = useState<any>(null);
   const [onChain, setOnChain] = useState<any>(null);
   const [hasW, setHasW] = useState<boolean>(false);
+  const [funding, setFunding] = useState<boolean>(false);
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [errorOpen, setErrorOpen] = useState(false);
+  const [modalMsg, setModalMsg] = useState<string>("");
 
   const mdTheme = useMemo<"light" | "dark">(() => {
     if (typeof document !== "undefined" && document.documentElement.classList.contains("dark")) return "dark";
@@ -61,6 +71,39 @@ export default function ChallengeDetails() {
   const isFunded = !!onChain?.isFunded;
   const tokenLabel = onChain?.isERC20 ? String(onChain?.token) : "ETH";
   const totalPrizeHuman = ipfs?.totalPrize || String(onChain?.totalPrize ?? "");
+  const isSponsor = useMemo(() => {
+    if (!address || !onChain?.sponsor) return false;
+    return String(address).toLowerCase() === String(onChain.sponsor).toLowerCase();
+  }, [address, onChain?.sponsor]);
+
+  const onFund = async () => {
+    if (!escrow || !challengeId) return;
+    setFunding(true);
+    try {
+      const cid = BigInt(Number(challengeId));
+      const value = onChain?.isERC20 ? undefined : (onChain?.totalPrize as bigint | undefined);
+      // If ERC20, approve escrow to pull totalPrize first
+      if (onChain?.isERC20) {
+        const erc20Approve = parseAbiItem("function approve(address spender, uint256 value) returns (bool)");
+        const { request } = await simulateContract(config, {
+          abi: [erc20Approve],
+          address: onChain.token as any,
+          functionName: "approve",
+          args: [escrow.address as any, onChain.totalPrize as bigint],
+        });
+        const approveHash = await writeContract(config, request);
+        await waitForTransactionReceipt(config, { hash: approveHash });
+      }
+      const { hash } = await escrow.fundChallenge(cid, value as any);
+      setModalMsg(`Challenge funded. Tx: ${hash}`);
+      setSuccessOpen(true);
+    } catch (e: any) {
+      setModalMsg(e?.shortMessage || e?.message || "Funding failed.");
+      setErrorOpen(true);
+    } finally {
+      setFunding(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -100,6 +143,16 @@ export default function ChallengeDetails() {
                 }>
                   {hasW ? "Winners announced" : "No winners yet"}
                 </span>
+                {!isFunded && isSponsor && (
+                  <button
+                    className="rounded-lg bg-primary-600 text-white px-3 py-1.5 text-xs disabled:opacity-60"
+                    onClick={onFund}
+                    disabled={funding}
+                    title={onChain?.isERC20 ? "Requires ERC20 allowance if ERC20 token" : "Pays with native token"}
+                  >
+                    {funding ? "Funding..." : "Fund Challenge"}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -141,6 +194,20 @@ export default function ChallengeDetails() {
           </Link>
         </div>
       </main>
+      <ResultModal
+        open={successOpen}
+        title="Success"
+        message={modalMsg}
+        onClose={() => setSuccessOpen(false)}
+        variant="success"
+      />
+      <ResultModal
+        open={errorOpen}
+        title="Action Failed"
+        message={modalMsg}
+        onClose={() => setErrorOpen(false)}
+        variant="error"
+      />
     </div>
   );
 }
