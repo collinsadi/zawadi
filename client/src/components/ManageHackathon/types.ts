@@ -7,6 +7,8 @@ export type EscrowChallenge = {
   ipfsCid: string;
   isFunded: boolean;
   sponsor: string;
+  // derived/UI-only flag
+  hasWinners?: boolean;
   data: {
     image: string;
     details: string;

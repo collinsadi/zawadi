@@ -60,6 +60,7 @@ export default function ManageHackathon() {
   const [winnersRows, setWinnersRows] = useState<Array<{ address: string; amount: string }>>([]);
   const [winnersError, setWinnersError] = useState<string>("");
   const [submittingWinners, setSubmittingWinners] = useState<boolean>(false);
+  const [approving, setApproving] = useState<boolean>(false);
 
   // Minimal ERC20 ABI to read decimals
   const ERC20_DECIMALS_ABI = [{
@@ -204,6 +205,11 @@ export default function ManageHackathon() {
               const res = await fetch(getPinataUrl(cid));
               if (res.ok) ipfs = await res.json();
             } catch {}
+            // Determine if winners exist for this challenge
+            let hasWinners = false;
+            try {
+              hasWinners = await escrow.hasWinners(row.id);
+            } catch {}
             const title = ipfs?.title || `Challenge #${idNum}`;
             const totalPrize = ipfs?.totalPrize || String(onChain.totalPrize);
             const isERC20 = !!onChain.isERC20;
@@ -217,6 +223,7 @@ export default function ManageHackathon() {
               ipfsCid: cid,
               isFunded: !!onChain.isFunded,
               sponsor: String(onChain.sponsor),
+              hasWinners,
               data: {
                 image: ipfs?.data?.image || "",
                 details: ipfs?.data?.details || ipfs?.brief || "",
@@ -291,17 +298,29 @@ export default function ManageHackathon() {
     setWhitelist((w) => w.filter((a) => a !== addr));
   };
 
-  const approveDistribution = (challengeId: number, actor: "organiser" | "sponsor") => {
-    setApprovals((prev) => {
-      const curr = prev[challengeId] || { organiserApproved: false, sponsorApproved: false };
-      return {
-        ...prev,
-        [challengeId]: {
-          organiserApproved: actor === "organiser" ? true : curr.organiserApproved,
-          sponsorApproved: actor === "sponsor" ? true : curr.sponsorApproved,
-        },
-      };
-    });
+  const approveDistribution = async (challengeId: number, actor: "organiser" | "sponsor") => {
+    if (!escrow) {
+      setModalMsg("Escrow not initialized yet. Try again in a moment.");
+      setErrorOpen(true);
+      return;
+    }
+    try {
+      setApproving(true);
+      const { hash } = await escrow.approveDistribution(BigInt(challengeId));
+      setModalMsg(`Approval submitted. Tx: ${hash}`);
+      setSuccessOpen(true);
+      // Refresh approvals for this challenge
+      try {
+        const a = await escrow.approvals(BigInt(challengeId));
+        setApprovals((prev) => ({ ...prev, [challengeId]: a }));
+      } catch {}
+    } catch (e: any) {
+      console.error(e);
+      setModalMsg(e?.shortMessage || e?.message || "Approval failed.");
+      setErrorOpen(true);
+    } finally {
+      setApproving(false);
+    }
     console.log("approveDistribution:", { challengeId, actor });
   };
 
@@ -408,6 +427,7 @@ export default function ManageHackathon() {
               onClose={() => setSelected(null)}
               onOpenWinners={(c) => openWinners(c)}
               onApprove={(challengeId, actor) => approveDistribution(challengeId, actor)}
+              approving={approving}
             />
           )}
 
@@ -478,6 +498,11 @@ export default function ManageHackathon() {
                           const res = await fetch(getPinataUrl(cid));
                           if (res.ok) ipfs = await res.json();
                         } catch {}
+                        // Determine if winners exist for this challenge
+                        let hasWinners = false;
+                        try {
+                          hasWinners = await escrow.hasWinners(row.id);
+                        } catch {}
                         const title = ipfs?.title || `Challenge #${idNum}`;
                         const totalPrize = ipfs?.totalPrize || String(onChain.totalPrize);
                         const isERC20 = !!onChain.isERC20;
@@ -491,6 +516,7 @@ export default function ManageHackathon() {
                           ipfsCid: cid,
                           isFunded: !!onChain.isFunded,
                           sponsor: String(onChain.sponsor),
+                          hasWinners,
                           data: {
                             image: ipfs?.data?.image || "",
                             details: ipfs?.data?.details || ipfs?.brief || "",

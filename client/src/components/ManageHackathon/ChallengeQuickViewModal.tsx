@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { EscrowChallenge, EscrowApproval } from './types';
 
 type Props = {
@@ -6,9 +7,12 @@ type Props = {
   onClose: () => void;
   onOpenWinners: (c: EscrowChallenge) => void;
   onApprove: (challengeId: number, actor: 'organiser' | 'sponsor') => void;
+  approving?: boolean;
 };
 
-export default function ChallengeQuickViewModal({ selected, approvals, onClose, onOpenWinners, onApprove }: Props) {
+export default function ChallengeQuickViewModal({ selected, approvals, onClose, onOpenWinners, onApprove, approving }: Props) {
+  const [confirmSponsorOpen, setConfirmSponsorOpen] = useState(false);
+  const sponsorPending = !approvals[selected.id]?.sponsorApproved;
   return (
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
@@ -35,12 +39,27 @@ export default function ChallengeQuickViewModal({ selected, approvals, onClose, 
                 )}
                 {selected.isFunded && (
                   <>
-                    <button className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs" onClick={() => onOpenWinners(selected)}>Add Winners</button>
-                    {!approvals[selected.id]?.organiserApproved && (
-                      <button className="rounded-lg bg-primary-600 text-white px-3 py-1.5 text-xs" onClick={() => onApprove(selected.id, 'organiser')}>Approve (Org)</button>
+                    {!selected.hasWinners && (
+                      <button className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs" onClick={() => onOpenWinners(selected)}>Add Winners</button>
                     )}
-                    {!approvals[selected.id]?.sponsorApproved && (
-                      <button className="rounded-lg bg-primary-600 text-white px-3 py-1.5 text-xs" onClick={() => onApprove(selected.id, 'sponsor')}>Approve (Sponsor)</button>
+                    {!approvals[selected.id]?.organiserApproved && (
+                      <button
+                        className="rounded-lg bg-primary-600 text-white px-3 py-1.5 text-xs disabled:opacity-60"
+                        onClick={() => onApprove(selected.id, 'organiser')}
+                        disabled={!!approving}
+                        title={approving ? 'Approving...' : 'Approve funds disbursement'}
+                      >
+                        {approving ? 'Approving...' : 'Approve (Org)'}
+                      </button>
+                    )}
+                    {sponsorPending && (
+                      <button
+                        className="rounded-lg bg-primary-600 text-white px-3 py-1.5 text-xs disabled:opacity-60"
+                        onClick={() => setConfirmSponsorOpen(true)}
+                        disabled={!!approving}
+                      >
+                        {approving ? 'Approving...' : 'Approve (Sponsor)'}
+                      </button>
                     )}
                   </>
                 )}
@@ -49,6 +68,35 @@ export default function ChallengeQuickViewModal({ selected, approvals, onClose, 
           </div>
         </div>
       </div>
+      {/* Confirm Sponsor Approve Modal */}
+      {confirmSponsorOpen && (
+        <div className="fixed inset-0 z-[60]">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setConfirmSponsorOpen(false)} />
+          <div className="absolute inset-0 p-4 sm:p-6 flex items-center justify-center">
+            <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl overflow-hidden">
+              <div className="p-4 sm:p-5">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Confirm Approval</h3>
+                <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">
+                  This approval moves the challenge one step closer to allowing winners to withdraw their prizes. If you have any off-chain KYC or verification to perform, please ensure that is completed before approving.
+                </p>
+                <div className="mt-5 flex items-center justify-end gap-2">
+                  <button className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs" onClick={() => setConfirmSponsorOpen(false)}>Cancel</button>
+                  <button
+                    className="rounded-lg bg-primary-600 text-white px-3 py-1.5 text-xs disabled:opacity-60"
+                    onClick={() => {
+                      setConfirmSponsorOpen(false);
+                      onApprove(selected.id, 'sponsor');
+                    }}
+                    disabled={!!approving}
+                  >
+                    {approving ? 'Approving...' : 'Confirm Approve'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
