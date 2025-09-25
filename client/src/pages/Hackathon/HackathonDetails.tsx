@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import Navbar from "../../components/UI/Navbar";
 import type { Hackathon } from "../../types/Hackathon";
 import MarkdownPreview from "@uiw/react-markdown-preview";
 import ChallengeCards, { type ChallengeCard } from "../../components/Challenge/ChallengeCards";
 import { getHackathonById as getHackathonOnChain } from "../../services/factoryService";
 import { getPinataUrl } from "../../config/pinata";
+import { useAccount } from "wagmi";
 
 // Simple helpers
 const fmtDate = (iso?: string) => {
@@ -36,7 +37,10 @@ export default function HackathonDetails() {
   const [hackathon, setHackathon] = useState<Hackathon | null>(initial ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [organizer, setOrganizer] = useState<string | null>(null);
+  const { address } = useAccount();
 
+  // Fetch IPFS data if not provided via navigation state
   useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -45,6 +49,7 @@ export default function HackathonDetails() {
       setError(null);
       try {
         const onChain = await getHackathonOnChain(id as any);
+        setOrganizer(onChain.organizer as unknown as string);
         const url = getPinataUrl(onChain.ipfsCid);
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -61,6 +66,29 @@ export default function HackathonDetails() {
       cancelled = true;
     };
   }, [id]);
+
+  // Always fetch organizer address from on-chain to gate Manage button
+  useEffect(() => {
+    let cancelled = false;
+    async function loadOrganizer() {
+      if (!id) return;
+      try {
+        const onChain = await getHackathonOnChain(id as any);
+        if (!cancelled) setOrganizer(onChain.organizer as unknown as string);
+      } catch {
+        // ignore organizer fetch errors here; button will simply not show
+      }
+    }
+    loadOrganizer();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  const isOrganizer = useMemo(() => {
+    if (!address || !organizer) return false;
+    return String(address).toLowerCase() === String(organizer).toLowerCase();
+  }, [address, organizer]);
 
   const [activeTab, setActiveTab] = useState<
     "challenges" | "details" | "winners"
@@ -246,9 +274,14 @@ export default function HackathonDetails() {
             </div>
 
             <div className="mt-5 flex gap-3">
-              <button className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-700">
-                Manage
-              </button>
+              {!loading && hackathon && isOrganizer && (
+                <Link
+                  to={`/hackathons/${id}/manage`}
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-700"
+                >
+                  Manage
+                </Link>
+              )}
             </div>
           </aside>
         </div>
