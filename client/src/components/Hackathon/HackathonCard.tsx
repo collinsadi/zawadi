@@ -10,6 +10,7 @@ export default function HackathonCard({ hack }: { hack: Hackathon }) {
           <img
             src={hack.cover}
             alt={hack.title}
+            loading="lazy"
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (

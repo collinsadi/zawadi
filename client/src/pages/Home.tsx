@@ -5,6 +5,7 @@ import type { Hackathon } from "../types/Hackathon";
 import { FiFilter } from "react-icons/fi";
 import { getAllHackathons as getAllHackathonsOnChain } from "../services/factoryService";
 import { getPinataUrl } from "../config/pinata";
+import SkeletonHackathonCard from "../components/Hackathon/SkeletonHackathonCard";
 
 export default function HomePage() {
   const [showFilters, setShowFilters] = useState(false);
@@ -20,9 +21,11 @@ export default function HomePage() {
       setError(null);
       try {
         const onChain = await getAllHackathonsOnChain();
+        // Newest first
+        const newestFirst = [...onChain].reverse();
         // Fetch IPFS JSON for each entry
         const resolved: Hackathon[] = await Promise.all(
-          onChain.map(async (h) => {
+          newestFirst.map(async (h) => {
             try {
               const url = getPinataUrl(h.ipfsCid);
               const res = await fetch(url);
@@ -111,17 +114,22 @@ export default function HomePage() {
         </section>
 
         <section>
-          {loading && (
-            <div className="text-slate-600 dark:text-slate-300 mb-4">Loading hackathons...</div>
-          )}
           {error && (
             <div className="text-red-600 dark:text-red-400 mb-4">Failed to load hackathons: {error}</div>
           )}
-          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((hack: Hackathon) => (
-              <HackathonCard key={hack.id} hack={hack} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <SkeletonHackathonCard key={i} />
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              {filtered.map((hack: Hackathon) => (
+                <HackathonCard key={hack.id} hack={hack} />
+              ))}
+            </div>
+          )}
         </section>
       </main>
     </div>
