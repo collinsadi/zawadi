@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import { PinataUtils } from "../../common/utils/pinata/index";
+import { PinataUtils } from "../../common/utils/pinata/index.js";
 
 export const ipfsRouter = Router();
 

@@ -2,9 +2,9 @@ import express, { NextFunction, Request, Response } from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 const app = express();
-import { ENVIRONMENT } from "./common/config/environment";
+import { ENVIRONMENT } from "./common/config/environment.js";
 import cors from "cors";
-import { ipfsRouter } from "./modules/IPFS/routes";
+import { ipfsRouter } from "./modules/IPFS/routes.js";
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
