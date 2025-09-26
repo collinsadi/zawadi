@@ -88,7 +88,7 @@ export default function Landing() {
               </h3>
               <p className="mt-1 text-sm text-slate-600">
                 Winners withdraw rewards directly from the contract. No
-                intermediaries, no delays—fully transparent and auditable.
+                intermediaries, no delays, fully transparent and auditable.
               </p>
             </div>
           </div>
@@ -104,7 +104,7 @@ export default function Landing() {
           <p className="mt-2 text-sm sm:text-base text-slate-600">
             Drop‑in, plug‑and‑play. Works alongside existing hackathon
             platforms, tooling, and workflows. On‑chain transparency with
-            off‑chain UX preserved—no migrations, no rewrites.
+            off‑chain UX preserved, no migrations, no rewrites.
           </p>
         </div>
       </section>
