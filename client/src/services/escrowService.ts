@@ -163,13 +163,6 @@ export function createEscrowService(address: Address) {
       args: [offset, limit],
     }) as Promise<[Challenge[], bigint[]]>;
 
-  const getChallengeIds = async (): Promise<bigint[]> =>
-    readContract(config, {
-      abi: escrowAbi,
-      address: escrowAddress,
-      functionName: "getChallengeIds",
-      args: [],
-    }) as Promise<bigint[]>;
 
   const getAllChallenges = async (): Promise<ChallengeWithId[]> => {
     // Prefer paginated getter

@@ -33,7 +33,6 @@ export default function ManageHackathon() {
 
   const initial = (location.state as any) || {};
   const [organiser, setOrganiser] = useState<string>(initial.organiser || "");
-  const [escrowAddr, setEscrowAddr] = useState<string>(initial.escrow || "");
   const [escrow, setEscrow] = useState<ReturnType<typeof createEscrowService> | null>(null);
   const [loadingEscrow, setLoadingEscrow] = useState<boolean>(true);
   const [checkingSponsor, setCheckingSponsor] = useState<boolean>(true);
@@ -84,7 +83,6 @@ export default function ManageHackathon() {
         setOrganiser(orgAddr);
         const ea = onChain.escrowContract as unknown as string;
         console.log('[Manage] loaded hackathon on-chain', { id, organizer: orgAddr, escrow: ea });
-        setEscrowAddr(ea);
         setEscrow(createEscrowService(ea as any));
       } catch (e) {
         console.error("Failed to load escrow for manage page", e);
@@ -391,7 +389,6 @@ export default function ManageHackathon() {
         <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* Whitelist */}
           <WhitelistPanel
-            organiser={organiser}
             whitelist={whitelist}
             newSponsor={newSponsor}
             onChangeNewSponsor={setNewSponsor}

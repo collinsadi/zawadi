@@ -1,6 +1,5 @@
 import { useState } from "react";
 type Props = {
-  organiser: string;
   whitelist: string[];
   newSponsor: string;
   onChangeNewSponsor: (v: string) => void;
@@ -9,7 +8,6 @@ type Props = {
 };
 
 export default function WhitelistPanel({
-  organiser,
   whitelist,
   newSponsor,
   onChangeNewSponsor,

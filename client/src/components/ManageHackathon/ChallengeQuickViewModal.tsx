@@ -12,7 +12,6 @@ type Props = {
 
 export default function ChallengeQuickViewModal({ selected, approvals, onClose, onOpenWinners, onApprove, approving }: Props) {
   const [confirmSponsorOpen, setConfirmSponsorOpen] = useState(false);
-  const sponsorPending = !approvals[selected.id]?.sponsorApproved;
   return (
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
