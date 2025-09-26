@@ -6,20 +6,28 @@ if (typeof File === 'undefined') {
   global.File = class File {
     private _buffer: Buffer;
 
-    constructor(buffer: Buffer | ArrayBuffer | ArrayBufferView, name: string, options: { type?: string; lastModified?: number } = {}) {
+    constructor(buffer: Buffer | ArrayBuffer | ArrayBufferView | undefined, name: string, options: { type?: string; lastModified?: number } = {}) {
       this.name = name;
       this.lastModified = options.lastModified || Date.now();
-      this.size = buffer instanceof Buffer ? buffer.length : buffer.byteLength;
-      this.type = options.type || '';
       
-      // Convert to Buffer safely
-      if (buffer instanceof Buffer) {
-        this._buffer = buffer;
-      } else if (buffer instanceof ArrayBuffer) {
-        this._buffer = Buffer.from(buffer);
+      // Handle undefined buffer case
+      if (buffer === undefined) {
+        this._buffer = Buffer.alloc(0);
+        this.size = 0;
       } else {
-        this._buffer = Buffer.from(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+        this.size = buffer instanceof Buffer ? buffer.length : buffer.byteLength;
+        
+        // Convert to Buffer safely
+        if (buffer instanceof Buffer) {
+          this._buffer = buffer;
+        } else if (buffer instanceof ArrayBuffer) {
+          this._buffer = Buffer.from(buffer);
+        } else {
+          this._buffer = Buffer.from(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+        }
       }
+      
+      this.type = options.type || '';
     }
 
     name: string;
