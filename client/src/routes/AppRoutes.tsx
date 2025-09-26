@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import Home from "../pages/Home";
+import Landing from "../pages/Landing";
 import CreateHackathon from "../pages/Hackathon/CreateHackathon";
 import HackathonDetails from "../pages/Hackathon/HackathonDetails";
 import AddChallenge from "../pages/Hackathon/AddChallenge";
@@ -12,7 +13,8 @@ const AppRoutes = () => {
     <Router>
       <Routes>
         {/* Active Routes */}
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<Landing />} />
+        <Route path="/hackathons" element={<Home />} />
         <Route
           path="/hackathons/new"
           element={
@@ -47,3 +49,4 @@ const AppRoutes = () => {
 };
 
 export default AppRoutes;
+

@@ -4,7 +4,7 @@ export type ChallengeCard = {
   id: number | string;
   title: string;
   totalPrize: string;
-  token: string; // address or "ETH"
+  token: string; // token contract address or "ETH"
   isERC20: boolean;
   isFunded?: boolean;
   data: {
@@ -87,7 +87,7 @@ export default function ChallengeCards({ items, showStatus = true, onSelect, bui
               ) : (
                 <span />
               )}
-              {/* spacer for potential actions */}
+              
             </div>
           </button>
         ))}
