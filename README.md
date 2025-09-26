@@ -3,6 +3,28 @@
  Version: 1.0  
  Last updated: 2025-09-26
 
+ Demo Video : https://youtu.be/QRYhTMeOOPk
+
+ ## Table of Contents
+ - [Abstract](#abstract)
+ - [Problem Statement](#problem-statement)
+ - [System Architecture](#system-architecture)
+ - [Smart Contracts](#smart-contracts)
+   - [Factory.sol](#factorysol)
+   - [Escrow.sol](#escrowsol)
+ - [Off-Chain Components (Example Implementation of the protocol)](#off-chain-components-example-implementation-of-the-protocol)
+ - [Backend API (IPFS Pinning)](#backend-api-ipfs-pinning)
+ - [Protocol Workflows](#protocol-workflows)
+ - [Data Model and Events](#data-model-and-events)
+ - [Security Considerations](#security-considerations)
+ - [Economics and Fees](#economics-and-fees)
+ - [Governance](#governance)
+ - [Frontend UX Notes](#frontend-ux-notes)
+ - [Metadata and IPFS](#metadata-and-ipfs)
+ - [Specifications and Interoperability](#specifications-and-interoperability)
+ - [References (Code Citations)](#references-code-citations)
+ - [Appendix: Example User Journeys](#appendix-example-user-journeys)
+
  ## Abstract
  Zawadi is a decentralized protocol for managing hackathon prize escrows. It enables organizers to create hackathons, whitelist sponsors, set up prize challenges, accept funding in ERC20 or native ETH, define winners and allocations, require dual approvals from organizer and sponsor, and allow self-service winner payouts. The system is composed of:
 
