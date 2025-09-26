@@ -1,6 +1,54 @@
 import { PinataSDK } from "pinata";
 import { ENVIRONMENT } from "../../../common/config/environment.js";
 
+// File constructor polyfill for Node.js environments
+if (typeof File === 'undefined') {
+  global.File = class File {
+    private _buffer: Buffer;
+
+    constructor(buffer: Buffer | ArrayBuffer | ArrayBufferView, name: string, options: { type?: string; lastModified?: number } = {}) {
+      this.name = name;
+      this.lastModified = options.lastModified || Date.now();
+      this.size = buffer instanceof Buffer ? buffer.length : buffer.byteLength;
+      this.type = options.type || '';
+      
+      // Convert to Buffer safely
+      if (buffer instanceof Buffer) {
+        this._buffer = buffer;
+      } else if (buffer instanceof ArrayBuffer) {
+        this._buffer = Buffer.from(buffer);
+      } else {
+        this._buffer = Buffer.from(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+      }
+    }
+
+    name: string;
+    lastModified: number;
+    size: number;
+    type: string;
+
+    async arrayBuffer(): Promise<ArrayBuffer> {
+      const buffer = this._buffer.buffer.slice(this._buffer.byteOffset, this._buffer.byteOffset + this._buffer.byteLength);
+      return buffer as ArrayBuffer;
+    }
+
+    async text(): Promise<string> {
+      return this._buffer.toString();
+    }
+
+    stream(): ReadableStream {
+      const buffer = this._buffer;
+      const readable = new ReadableStream({
+        start(controller) {
+          controller.enqueue(buffer);
+          controller.close();
+        }
+      });
+      return readable;
+    }
+  } as any;
+}
+
 export class PinataUtils {
   private pinata: PinataSDK;
 
