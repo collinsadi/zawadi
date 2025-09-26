@@ -100,14 +100,30 @@ export function createEscrowService(address: Address) {
 
   // New signature: allocations(address winner, uint256 challengeId) => Allocation
   const allocations = async (winner: Address, challengeId: bigint): Promise<Allocation> => {
-    const fn = parseAbiItem("function allocations(address,uint256) view returns (uint256 position, uint256 amount, address winner, bool claimed, uint256 challenge)");
     const res = await readContract(config, {
-      abi: [fn],
+      abi: escrowAbi,
       address: escrowAddress,
       functionName: "allocations",
       args: [winner, challengeId],
     });
-    return res as unknown as Allocation;
+    const anyRes: any = res;
+    // viem/wagmi may return either a structured object with named fields or a tuple/array.
+    // Normalize to Allocation shape consistently.
+    if (Array.isArray(anyRes)) {
+      const position = BigInt(anyRes?.[0] ?? 0n);
+      const amount = BigInt(anyRes?.[1] ?? 0n);
+      const winnerAddr = anyRes?.[2] as Address;
+      const claimed = !!anyRes?.[3];
+      const challenge = BigInt(anyRes?.[4] ?? 0n);
+      return { position, amount, winner: winnerAddr, claimed, challenge } as Allocation;
+    }
+    // Object form with named props
+    const position = BigInt((anyRes?.position ?? 0) as any);
+    const amount = BigInt((anyRes?.amount ?? 0) as any);
+    const winnerAddr = anyRes?.winner as Address;
+    const claimed = !!anyRes?.claimed;
+    const challenge = BigInt((anyRes?.challenge ?? 0) as any);
+    return { position, amount, winner: winnerAddr, claimed, challenge } as Allocation;
   };
 
   // Direct read: enumerable whitelisted sponsors (if contract supports it)

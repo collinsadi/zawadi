@@ -113,6 +113,17 @@ export default function ChallengeDetails() {
       try {
         const cid = BigInt(Number(challengeId));
         const alloc = await escrow.allocationsForMe(address as any, cid);
+        // Debug log: check allocations mapping for this user and challenge
+
+        console.log("allocations", alloc)
+        console.log("[allocations] ChallengeDetails", {
+          address: String(address),
+          challengeId: Number(challengeId),
+          position: alloc?.position?.toString?.() ?? alloc?.position,
+          amount: alloc?.amount?.toString?.() ?? alloc?.amount,
+          winner: String(alloc?.winner || ""),
+          claimed: !!alloc?.claimed,
+        });
         if (!cancelled) setMyAlloc(alloc);
       } catch {
         if (!cancelled) setMyAlloc(null);

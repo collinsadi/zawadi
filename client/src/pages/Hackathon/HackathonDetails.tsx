@@ -184,6 +184,15 @@ export default function HackathonDetails() {
             const cid = BigInt(cidNum);
             try {
               const alloc = await escrow.allocations(address as any, cid);
+              // Debug log: check allocations mapping for this user and challenge during load
+              console.log("[allocations] HackathonDetails", {
+                address: String(address),
+                challengeId: cidNum,
+                position: alloc?.position?.toString?.() ?? alloc?.position,
+                amount: alloc?.amount?.toString?.() ?? alloc?.amount,
+                winner: String(alloc?.winner || ""),
+                claimed: !!alloc?.claimed,
+              });
               return [cidNum, { claimed: !!alloc.claimed, amount: alloc.amount }] as const;
             } catch {
               return [cidNum, { claimed: false, amount: 0n }] as const;
@@ -209,6 +218,16 @@ export default function HackathonDetails() {
       try {
         if (address) {
           const alloc = await escrow.allocations(address as any, BigInt(challengeId));
+          // Debug log: check allocations mapping for this user and challenge after claim
+          console.log("allocations", alloc)
+          console.log("[allocations] HackathonDetails after claim", {
+            address: String(address),
+            challengeId,
+            position: alloc?.position?.toString?.() ?? alloc?.position,
+            amount: alloc?.amount?.toString?.() ?? alloc?.amount,
+            winner: String(alloc?.winner || ""),
+            claimed: !!alloc?.claimed,
+          });
           setMyAllocs((prev) => ({ ...prev, [challengeId]: { claimed: !!alloc.claimed, amount: alloc.amount } }));
         }
       } catch {}

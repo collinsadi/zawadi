@@ -45,20 +45,11 @@ export default function ChallengeQuickViewModal({ selected, approvals, onClose, 
                     {!approvals[selected.id]?.organiserApproved && (
                       <button
                         className="rounded-lg bg-primary-600 text-white px-3 py-1.5 text-xs disabled:opacity-60"
-                        onClick={() => onApprove(selected.id, 'organiser')}
+                        onClick={() => setConfirmSponsorOpen(true)}
                         disabled={!!approving}
                         title={approving ? 'Approving...' : 'Approve funds disbursement'}
                       >
-                        {approving ? 'Approving...' : 'Approve (Org)'}
-                      </button>
-                    )}
-                    {sponsorPending && (
-                      <button
-                        className="rounded-lg bg-primary-600 text-white px-3 py-1.5 text-xs disabled:opacity-60"
-                        onClick={() => setConfirmSponsorOpen(true)}
-                        disabled={!!approving}
-                      >
-                        {approving ? 'Approving...' : 'Approve (Sponsor)'}
+                        {approving ? 'Approving...' : 'Approve'}
                       </button>
                     )}
                   </>
@@ -85,7 +76,7 @@ export default function ChallengeQuickViewModal({ selected, approvals, onClose, 
                     className="rounded-lg bg-primary-600 text-white px-3 py-1.5 text-xs disabled:opacity-60"
                     onClick={() => {
                       setConfirmSponsorOpen(false);
-                      onApprove(selected.id, 'sponsor');
+                      onApprove(selected.id, 'organiser');
                     }}
                     disabled={!!approving}
                   >
