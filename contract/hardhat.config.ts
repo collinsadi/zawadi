@@ -2,9 +2,10 @@ import type { HardhatUserConfig } from "hardhat/config";
 
 import hardhatToolboxMochaEthersPlugin from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
 import { configVariable } from "hardhat/config";
+import hardhatVerify from "@nomicfoundation/hardhat-verify";
 
 const config: HardhatUserConfig = {
-  plugins: [hardhatToolboxMochaEthersPlugin],
+  plugins: [hardhatToolboxMochaEthersPlugin, hardhatVerify],
   solidity: {
     profiles: {
       default: {
@@ -33,8 +34,8 @@ const config: HardhatUserConfig = {
     sepolia: {
       type: "http",
       chainType: "l1",
-      url: configVariable("SEPOLIA_RPC_URL"),
-      accounts: [configVariable("SEPOLIA_PRIVATE_KEY")],
+       url: ``,
+      accounts: [""],
     },
 
     hardhat: {
@@ -57,6 +58,16 @@ const config: HardhatUserConfig = {
       },
     },
   },
+
+  // Etherscan/Block Explorer verification config belongs at the top level,
+  // not inside `networks`. Using `configVariable` reads from env vars at runtime.
+
+  verify: {
+    etherscan: {
+      apiKey: "",
+    },
+  },
+
 };
 
 export default config;
