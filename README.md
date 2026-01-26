@@ -17,9 +17,10 @@
  - [Off-Chain Components (Example Implementation of the protocol)](#off-chain-components-example-implementation-of-the-protocol)
  - [Backend API (IPFS Pinning)](#backend-api-ipfs-pinning)
  - [Protocol Workflows](#protocol-workflows)
- - [Data Model and Events](#data-model-and-events)
- - [Security Considerations](#security-considerations)
- - [Economics and Fees](#economics-and-fees)
+- [Data Model and Events](#data-model-and-events)
+- [Security Considerations](#security-considerations)
+- [Security](#security)
+- [Economics and Fees](#economics-and-fees)
  - [Governance](#governance)
  - [Frontend UX Notes](#frontend-ux-notes)
  - [Metadata and IPFS](#metadata-and-ipfs)
@@ -272,6 +273,15 @@ Path: `contract/contracts/Zawadi/Escrow.sol`
   - No proxy pattern; contracts are simple and immutable.  
   - `Factory` owner is transferable.  
   - `Escrow` organizer set at creation; cannot be changed in current design.
+
+---
+
+## Security
+
+This project has undergone a pre-audit security assessment.
+A full third-party audit is planned prior to mainnet deployment.
+
+See: [audit/PRE_AUDIT_REPORT.md](audit/PRE_AUDIT_REPORT.md)
 
 ---
 
