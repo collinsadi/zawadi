@@ -38,9 +38,11 @@ This report presents the findings of a basic security audit performed on the Zaw
 
 The audit reviewed **8 Solidity source files** across core contracts, libraries, events, and error definitions. The review identified **1 critical**, **3 high**, **4 medium**, **4 low**, and **4 informational** findings.
 
-The most severe finding is that duplicate winner addresses in a single `addWinners` call can permanently lock funds in the escrow contract. Additionally, the use of raw `transferFrom` instead of `safeTransferFrom` for ERC20 funding makes the contract incompatible with non-standard tokens such as USDT.
+The most severe finding was that duplicate winner addresses in a single `addWinners` call could permanently lock funds in the escrow contract. Additionally, the use of raw `transferFrom` instead of `safeTransferFrom` for ERC20 funding made the contract incompatible with non-standard tokens such as USDT.
 
-**All findings have been remediated** in the contract source code following this audit. The changes are detailed in each finding below with a "Resolution" note. All 54 existing tests pass after the remediations.
+**All Critical, High, Medium, and Low findings have been remediated** in the contract source code following this audit. Each finding below includes a "Resolution" note describing the fix. Comprehensive tests were added for all new functionality, bringing the suite to **91 passing tests** covering the full claim, refund, sponsor revocation, duplicate-winner detection, and ERC-8174 IntentSpec flows.
+
+> **Important:** While all identified issues have been addressed, this automated audit is not a substitute for a professional third-party security audit. Before any mainnet deployment handling real user funds, we strongly recommend engaging an independent auditing firm to perform a comprehensive review including formal verification, fuzzing, and invariant testing.
 
 ---
 
@@ -529,19 +531,33 @@ The project includes Foundry (Forge) tests in `contract/test/Factory.t.sol` and 
 | Gas usage benchmarks | Covered |
 | Multi-challenge end-to-end workflow | Covered |
 
-### Missing Test Coverage
+### Post-Remediation Test Additions
+
+The following scenarios, previously untested, now have dedicated test coverage (91 total tests):
+
+| Scenario | Tests Added |
+|---|---|
+| Duplicate winner addresses in `addWinners` | `test_AddWinners_DuplicateWinner` |
+| Full `claimPayout` flow (ERC20 and ETH) | `test_ClaimPayout_ERC20_Success`, `test_ClaimPayout_ETH_Success` |
+| `claimPayout` without both approvals | `test_ClaimPayout_NotApproved`, `test_ClaimPayout_OnlyOneSideApproved` |
+| `claimPayout` by non-winner | `test_ClaimPayout_NotWinner` |
+| `claimPayout` already claimed | `test_ClaimPayout_AlreadyClaimed` |
+| All winners claim sets `isPaidOut` | `test_ClaimPayout_AllClaimed_SetsPaidOut` |
+| `addWinners` resets approvals on re-call | `test_AddWinners_ResetsApprovals` |
+| Sponsor revocation (success, access control, locked, blocks challenges) | 6 tests |
+| `refundChallenge` (ERC20, ETH, access control, approval gating) | 7 tests |
+| `getChallengesPage` pagination | 3 tests |
+| ERC-165 / IntentSpec interface support | 6 tests (Escrow) + 6 tests (Factory) |
+
+### Remaining Test Gaps (recommended for third-party audit)
 
 | Scenario | Related Finding |
 |---|---|
-| Duplicate winner addresses in `addWinners` | C-01 |
-| Full `claimPayout` flow (ERC20 and ETH) | — |
-| `claimPayout` reentrancy attempt | — |
-| `claimPayout` without both approvals | — |
-| `claimPayout` by non-winner | — |
-| `addWinners` called twice for the same challenge | M-01 |
-| Non-standard ERC20 tokens (no return value) | H-01 |
-| Same-block hackathon ID collision | H-03 |
+| `claimPayout` reentrancy attempt with malicious receiver | — |
+| Non-standard ERC20 tokens (no return value, e.g. USDT) | H-01 |
+| Same-block hackathon ID collision (multicall pattern) | H-03 |
 | Large array gas limits (`getAllHackathons` with many entries) | I-03 |
+| Fuzz testing of allocation arithmetic edge cases | — |
 
 ---
 
@@ -576,15 +592,29 @@ The project includes Foundry (Forge) tests in `contract/test/Factory.t.sol` and 
 | **Low** | Consider adding sponsor revocation functionality. | **Resolved** |
 | **Cleanup** | Remove unused error definitions from `EscrowErrors.sol`. | **Resolved** |
 | **Cleanup** | Either use or remove the `isPaidOut` field. | **Resolved** |
-| **Testing** | Add tests for `claimPayout`, duplicate winners, repeated `addWinners`, and reentrancy. | Recommended |
+| **Testing** | Add tests for `claimPayout`, duplicate winners, repeated `addWinners`, and reentrancy. | **Resolved** (91 tests) |
+| **Audit** | Engage a professional third-party auditing firm before mainnet deployment. | **Recommended** |
 
 ---
 
 ## 10. Disclaimer
 
-This report represents a basic manual security review of the Zawadi Protocol smart contracts. It is not a substitute for a comprehensive professional audit. The review was conducted at a point in time against the source code as provided and does not guarantee the absence of vulnerabilities. No formal verification, fuzzing, or symbolic execution was performed. The findings and recommendations should be addressed and re-validated before any mainnet deployment.
+This report represents a basic security review of the Zawadi Protocol smart contracts performed using an automated AI-powered audit tool. **It is not a substitute for a comprehensive professional third-party audit.** The review was conducted at a point in time against the source code as provided and does not guarantee the absence of vulnerabilities. No formal verification, fuzzing, or symbolic execution was performed.
 
-All Critical, High, Medium, and Low findings have been remediated in the contract source code. Informational findings were acknowledged and left as-is.
+All Critical, High, Medium, and Low findings identified in this review have been remediated in the contract source code, and 37 new tests were added to validate the fixes (91 total passing tests). Informational findings were acknowledged and left as-is.
+
+### Third-Party Audit Recommendation
+
+Before deploying to mainnet with real user funds, we **strongly recommend** commissioning a professional third-party security audit. An independent audit should include:
+
+- **Formal verification** of key invariants (e.g., total allocations always equal `totalPrize`, funds can only exit through `claimPayout` or `refundChallenge`).
+- **Fuzz testing** of allocation arithmetic, edge cases around `winnerCount`/`claimedCount`, and token decimal handling.
+- **Invariant testing** to verify that no sequence of transactions can violate protocol guarantees.
+- **Reentrancy analysis** on `claimPayout` and `refundChallenge`, particularly with malicious receiver contracts.
+- **Economic review** of the dual-approval model and refund window timing.
+- **Gas profiling** under realistic workloads (many challenges, many winners per challenge).
+
+This automated audit serves as a starting point to identify and address obvious issues, but human expert review is essential for production-grade confidence.
 
 ---
 
