@@ -5,13 +5,20 @@ import "./Escrow.sol";
 import "../Libraries/FactoryLib.sol";
 import "../Errors/FactoryError.sol";
 import "../Events/FactoryEvents.sol";
+import {ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
+import {IIntentSpec} from "../Interfaces/IIntentSpec.sol";
 
 /**
  * @title Factory
- * @dev Factory contract for creating and managing hackathon escrow contracts
- * @notice This contract allows organizers to create hackathons and deploy associated escrow contracts
+ * @notice Factory contract for creating and managing hackathon escrow contracts.
+ * @custom:agent-version 2.0
+ * @custom:agent-description Factory that deploys per-hackathon Escrow contracts, indexes them by bytes32 ID, and manages factory-level ownership.
+ * @custom:agent-invariant Each hackathon ID is unique; duplicate IDs are rejected.
+ * @custom:agent-invariant The factory never holds user funds; all funds go to deployed Escrow instances.
+ * @custom:agent-event HackathonCreated A new hackathon was created and its Escrow contract deployed.
+ * @custom:agent-event OwnershipTransferred Factory ownership was transferred to a new address.
  */
-contract Factory {
+contract Factory is ERC165, IIntentSpec {
     /// @notice Address of the factory owner who can transfer ownership
     address public factoryOwner;
     
@@ -21,62 +28,70 @@ contract Factory {
     /// @notice Mapping from hackathon ID to hackathon details for efficient lookups
     mapping(bytes32 => FactoryLib.Hackathon) public hackathons;
 
-    /**
-     * @dev Constructor sets the deployer as the initial factory owner
-     */
-    constructor() {
+    string private _intentSpecURI;
+    string private _escrowIntentSpecURI;
+
+    constructor(string memory factoryURI, string memory escrowURI) {
         factoryOwner = msg.sender;
+        _intentSpecURI = factoryURI;
+        _escrowIntentSpecURI = escrowURI;
     }
 
-    // Modifiers
-    
-    /**
-     * @dev Modifier that restricts access to the factory owner only
-     * @notice Reverts if the caller is not the factory owner
-     */
     modifier onlyFactoryOwner() {
         if (msg.sender != factoryOwner)
             revert Factory__OnlyFactoryOwnerCanAccess();
         _;
     }
 
-    /**
-     * @dev Modifier that restricts access to the organizer of a specific hackathon
-     * @param _id The unique identifier of the hackathon
-     * @notice Reverts if the hackathon doesn't exist or caller is not the organizer
-     */
-    modifier onlyOrganizer(bytes32 _id) {
-        FactoryLib.Hackathon memory hackathon = hackathons[_id];
-        if (hackathon.organizer == address(0))
-            revert Factory__HackathonDoesNotExist();
+    // --- ERC-165 + ERC-8174 ---
 
-        if (msg.sender != hackathon.organizer)
-            revert Factory__OnlyOrganizerCanAccess();
-        _;
+    function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {
+        return interfaceId == type(IIntentSpec).interfaceId || super.supportsInterface(interfaceId);
     }
 
-    // Events are imported from FactoryEvents.sol
+    /// @inheritdoc IIntentSpec
+    function getIntentSpecURI() external view override returns (string memory) {
+        return _intentSpecURI;
+    }
+
+    /**
+     * @notice Sets the ERC-8174 Intent Spec metadata URI
+     * @param uri The IPFS or HTTPS URI pointing to the Intent Spec JSON
+     * @custom:agent-intent Sets the machine-readable semantic metadata URI for this contract.
+     * @custom:agent-precondition Caller must be the factory owner.
+     * @custom:agent-effect Updates the intentSpecURI storage variable.
+     * @custom:agent-risk URI should reference immutable content; a mutable URI may mislead agents.
+     */
+    function setIntentSpecURI(string calldata uri) external onlyFactoryOwner {
+        _intentSpecURI = uri;
+    }
+
+    // --- Core functions ---
 
     /**
      * @notice Creates a new hackathon and deploys an associated escrow contract
-     * @dev Generates a unique hackathon ID using organizer address, IPFS CID, and timestamp
      * @param _ipfsCid The IPFS content identifier containing hackathon details
      * @return hackathonId The unique identifier for the created hackathon
      * @return escrowContract The address of the deployed escrow contract
-     * @notice The caller becomes the organizer of the hackathon
+     * @custom:agent-intent Creates a new hackathon entry, deploys a dedicated Escrow contract, and returns both the hackathon ID and the escrow address.
+     * @custom:agent-precondition _ipfsCid should be a valid IPFS CID pointing to hackathon metadata.
+     * @custom:agent-effect A new Escrow contract is deployed; hackathon is stored in mapping and array; emits HackathonCreated.
+     * @custom:agent-risk The caller becomes the organizer of the deployed Escrow; this is irreversible.
+     * @custom:agent-guidance Pin hackathon metadata to IPFS before calling. The returned escrowContract address is needed for all subsequent challenge operations.
      */
     function createHackathon(
         string memory _ipfsCid
     ) external returns (bytes32 hackathonId, address escrowContract) {
-        // Generate unique hackathon ID
         hackathonId = keccak256(
-            abi.encodePacked(msg.sender, _ipfsCid, block.timestamp)
+            abi.encodePacked(msg.sender, _ipfsCid, block.timestamp, allHackathons.length)
         );
 
-        // Deploy new Escrow contract
-        escrowContract = address(new Escrow(msg.sender));
+        if (hackathons[hackathonId].organizer != address(0)) {
+            revert Factory__HackathonAlreadyExists(_ipfsCid);
+        }
 
-        // Create hackathon struct
+        escrowContract = address(new Escrow(msg.sender, _escrowIntentSpecURI));
+
         FactoryLib.Hackathon memory newHackathon = FactoryLib.Hackathon({
             ipfsCid: _ipfsCid,
             escrowContract: escrowContract,
@@ -84,13 +99,9 @@ contract Factory {
             id: hackathonId
         });
 
-        // Store hackathon
         hackathons[hackathonId] = newHackathon;
-
-        // Add to allHackathons array
         allHackathons.push(newHackathon);
 
-        // Emit event
         emit HackathonCreated(
             hackathonId,
             msg.sender,
@@ -103,10 +114,11 @@ contract Factory {
 
     /**
      * @notice Retrieves hackathon details by its unique identifier
-     * @dev Reverts if the hackathon doesn't exist
      * @param _hackathonId The unique identifier of the hackathon to retrieve
      * @return The hackathon struct containing all details
-     * @notice Reverts with Factory__HackathonDoesNotExist if hackathon is not found
+     * @custom:agent-intent Looks up a hackathon by its bytes32 ID and returns its metadata, escrow address, and organizer.
+     * @custom:agent-effect None (read-only).
+     * @custom:agent-guidance Reverts if the hackathon does not exist. Check getHackathonCount first if unsure.
      */
     function getHackathonById(
         bytes32 _hackathonId
@@ -120,9 +132,10 @@ contract Factory {
 
     /**
      * @notice Retrieves all created hackathons
-     * @dev Returns the complete array of all hackathons
      * @return Array of all hackathon structs
-     * @notice This function can be gas-intensive for large numbers of hackathons
+     * @custom:agent-intent Returns the complete list of all hackathons for enumeration.
+     * @custom:agent-effect None (read-only).
+     * @custom:agent-risk May be gas-heavy for very large hackathon counts when called on-chain.
      */
     function getAllHackathons()
         external
@@ -134,8 +147,9 @@ contract Factory {
 
     /**
      * @notice Returns the total number of created hackathons
-     * @dev Returns the length of the allHackathons array
      * @return The total count of hackathons
+     * @custom:agent-intent Returns the number of hackathons created through this factory.
+     * @custom:agent-effect None (read-only).
      */
     function getHackathonCount() external view returns (uint256) {
         return allHackathons.length;
@@ -143,10 +157,13 @@ contract Factory {
 
     /**
      * @notice Transfers ownership of the factory to a new address
-     * @dev Can only be called by the current factory owner
      * @param _newOwner The address to transfer ownership to
-     * @notice Reverts if the new owner address is zero address
-     * @notice Emits OwnershipTransferred event upon successful transfer
+     * @custom:agent-intent Transfers the factory owner role to a new address.
+     * @custom:agent-precondition Caller must be the current factory owner.
+     * @custom:agent-precondition New owner must not be the zero address.
+     * @custom:agent-effect factoryOwner is updated; emits OwnershipTransferred.
+     * @custom:agent-risk Irreversible. The previous owner loses all factory-level privileges.
+     * @custom:agent-guidance Double-check the new owner address; there is no confirmation step.
      */
     function transferOwnership(address _newOwner) external onlyFactoryOwner {
         if (_newOwner == address(0)) revert Factory__InvalidAddress();
