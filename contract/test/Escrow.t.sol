@@ -88,7 +88,7 @@ contract EscrowTest is Test {
 
         // Deploy escrow contract
         vm.prank(organizer);
-        escrow = new Escrow(organizer);
+        escrow = new Escrow(organizer, "ipfs://escrow-test");
     }
 
     // Test Constructor
@@ -100,7 +100,7 @@ contract EscrowTest is Test {
 
     function test_Constructor_ZeroAddress() public {
         vm.expectRevert();
-        new Escrow(address(0));
+        new Escrow(address(0), "");
     }
 
     // Test whitelistSponsor function
@@ -422,8 +422,8 @@ contract EscrowTest is Test {
         escrow.addWinners(0, winners, allocations);
 
         // Verify allocations
-        (uint256 position1, uint256 amount1, address winner1_, bool claimed1, uint256 challenge1) = escrow.allocations(winner1);
-        (uint256 position2, uint256 amount2, address winner2_, bool claimed2, uint256 challenge2) = escrow.allocations(winner2);
+        (uint256 position1, uint256 amount1, address winner1_, bool claimed1, uint256 challenge1) = escrow.allocations(winner1, 0);
+        (uint256 position2, uint256 amount2, address winner2_, bool claimed2, uint256 challenge2) = escrow.allocations(winner2, 0);
 
         assertEq(position1, 1);
         assertEq(amount1, 600 * 10**18);
@@ -723,7 +723,7 @@ contract EscrowTest is Test {
         escrow.approveDistribution(0);
     }
 
-    function test_ApproveDistribution_ContractLocked() public {
+    function test_ApproveDistribution_ContractLocked_StillAllowed() public {
         // Setup
         vm.prank(organizer);
         escrow.whitelistSponsor(sponsor1);
@@ -744,10 +744,12 @@ contract EscrowTest is Test {
         vm.prank(organizer);
         escrow.lockContract();
 
-        // Try to approve after locking
+        // [M-02] Approval should succeed even when locked
         vm.prank(sponsor1);
-        vm.expectRevert();
         escrow.approveDistribution(0);
+
+        (bool sponsorApproved, ) = escrow.approvals(0);
+        assertTrue(sponsorApproved);
     }
 
     // Test unLockContract function
@@ -876,15 +878,15 @@ contract EscrowTest is Test {
         assertTrue(isFunded1);
         assertTrue(isFunded2);
 
-        (uint256 position1, uint256 amount1, address winner1_, bool claimed1, uint256 challenge1) = escrow.allocations(winner1);
+        (uint256 position1, uint256 amount1, address winner1_, bool claimed1, uint256 challenge1) = escrow.allocations(winner1, 0);
         assertEq(amount1, 1000 * 10**18);
         assertEq(challenge1, 0);
 
-        (uint256 position2, uint256 amount2, address winner2_, bool claimed2, uint256 challenge2) = escrow.allocations(winner2);
+        (uint256 position2, uint256 amount2, address winner2_, bool claimed2, uint256 challenge2) = escrow.allocations(winner2, 1);
         assertEq(amount2, 1.2 ether);
         assertEq(challenge2, 1);
 
-        (uint256 position3, uint256 amount3, address winner3_, bool claimed3, uint256 challenge3) = escrow.allocations(winner3);
+        (uint256 position3, uint256 amount3, address winner3_, bool claimed3, uint256 challenge3) = escrow.allocations(winner3, 1);
         assertEq(amount3, 0.8 ether);
         assertEq(challenge3, 1);
     }

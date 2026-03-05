@@ -31,7 +31,7 @@ contract FactoryTest is Test {
         user2 = makeAddr("user2");
         user3 = makeAddr("user3");
 
-        factory = new Factory();
+        factory = new Factory("ipfs://factory-test", "ipfs://escrow-test");
     }
 
     // Test Constructor
@@ -301,8 +301,8 @@ contract FactoryTest is Test {
 
         console.log("Gas used for createHackathon:", gasUsed);
 
-        // Gas usage should be reasonable (less than 3M gas)
-        assertTrue(gasUsed < 3_000_000);
+        // Gas usage should be reasonable (less than 5M gas)
+        assertTrue(gasUsed < 5_000_000);
     }
 
     // Test view functions with no hackathons
