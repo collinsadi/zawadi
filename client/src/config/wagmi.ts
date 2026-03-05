@@ -1,6 +1,6 @@
 import { getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { sepolia } from "wagmi/chains";
-// import { sepolia } from "../chains/hardhat";
+
 
 export const config = getDefaultConfig({
   appName: "Zawadi",

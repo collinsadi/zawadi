@@ -5,6 +5,11 @@
         "internalType": "address",
         "name": "_organizer",
         "type": "address"
+      },
+      {
+        "internalType": "string",
+        "name": "_escrowIntentSpecURI",
+        "type": "string"
       }
     ],
     "stateMutability": "nonpayable",
@@ -37,17 +42,22 @@
   },
   {
     "inputs": [],
-    "name": "Escrow_InvalidTokenTransfer",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "Escrow__ChallengeDoesNotExist",
     "type": "error"
   },
   {
     "inputs": [],
     "name": "Escrow__ConfigurationLocked",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "Escrow__DuplicateWinner",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "Escrow__EthTransferFailed",
     "type": "error"
   },
   {
@@ -73,6 +83,16 @@
   {
     "inputs": [],
     "name": "Escrow__OrganizerAlreadyApproved",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "Escrow__PayoutAlreadyClaimed",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "Escrow__RefundWindowNotOpen",
     "type": "error"
   },
   {
@@ -169,6 +189,31 @@
   },
   {
     "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "challengeId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "sponsor",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "ChallengeRefunded",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
     "inputs": [],
     "name": "ConfigurationLocked",
     "type": "event"
@@ -196,6 +241,44 @@
       }
     ],
     "name": "DistributionApproved",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "challengeId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "winner",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "PrizeClaimed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "sponsor",
+        "type": "address"
+      }
+    ],
+    "name": "SponsorRevoked",
     "type": "event"
   },
   {
@@ -466,6 +549,25 @@
     "inputs": [
       {
         "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "claimedCount",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
         "name": "_challengeId",
         "type": "uint256"
       }
@@ -612,6 +714,19 @@
   },
   {
     "inputs": [],
+    "name": "getIntentSpecURI",
+    "outputs": [
+      {
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "getWhitelistedSponsors",
     "outputs": [
       {
@@ -659,12 +774,70 @@
   {
     "inputs": [
       {
+        "internalType": "uint256",
+        "name": "_challengeId",
+        "type": "uint256"
+      }
+    ],
+    "name": "refundChallenge",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_sponsor",
+        "type": "address"
+      }
+    ],
+    "name": "revokeSponsor",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "uri",
+        "type": "string"
+      }
+    ],
+    "name": "setIntentSpecURI",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "address",
         "name": "",
         "type": "address"
       }
     ],
     "name": "sponsors",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes4",
+        "name": "interfaceId",
+        "type": "bytes4"
+      }
+    ],
+    "name": "supportsInterface",
     "outputs": [
       {
         "internalType": "bool",
@@ -709,6 +882,25 @@
         "internalType": "address",
         "name": "",
         "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "winnerCount",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",

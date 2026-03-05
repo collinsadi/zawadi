@@ -23,7 +23,13 @@ if (typeof File === 'undefined') {
         } else if (buffer instanceof ArrayBuffer) {
           this._buffer = Buffer.from(buffer);
         } else {
-          this._buffer = Buffer.from(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+          // Handle ArrayBufferView with undefined buffer property
+          if (buffer.buffer === undefined) {
+            this._buffer = Buffer.alloc(0);
+            this.size = 0;
+          } else {
+            this._buffer = Buffer.from(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+          }
         }
       }
       

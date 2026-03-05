@@ -6,6 +6,10 @@
  Demo Video : https://youtu.be/QRYhTMeOOPk
  
  On Sepolia Etherscan: https://sepolia.etherscan.io/address/0x285e9868d6CeA82295b50BaA2516a151900C51ea#code
+ 
+ New Audited Contract on Etherscan: https://sepolia.etherscan.io/address/0xBdE4dE795F53b0c5c3CFde78cF3aC104D016C2e1#code
+
+ Basic Security Audit Report: [audit/AUDIT_REPORT.md](audit/AUDIT_REPORT.md)
 
  ## Table of Contents
  - [Abstract](#abstract)
@@ -24,6 +28,7 @@
  - [Governance](#governance)
  - [Frontend UX Notes](#frontend-ux-notes)
  - [Metadata and IPFS](#metadata-and-ipfs)
+ - [ERC-8174: Intent Spec Support](#erc-8174-intent-spec-support)
  - [Specifications and Interoperability](#specifications-and-interoperability)
  - [References (Code Citations)](#references-code-citations)
  - [Appendix: Example User Journeys](#appendix-example-user-journeys)
@@ -278,10 +283,11 @@ Path: `contract/contracts/Zawadi/Escrow.sol`
 
 ## Security
 
-This project has undergone a pre-audit security assessment.
+This project has undergone a pre-audit security assessment and a basic security audit.
 A full third-party audit is planned prior to mainnet deployment.
 
-See: [audit/PRE_AUDIT_REPORT.md](audit/PRE_AUDIT_REPORT.md)
+- Pre-Audit Assessment: [audit/PRE_AUDIT_REPORT.md](audit/PRE_AUDIT_REPORT.md)
+- Basic Security Audit: [audit/AUDIT_REPORT.md](audit/AUDIT_REPORT.md)
 
 ---
 
@@ -324,6 +330,32 @@ See: [audit/PRE_AUDIT_REPORT.md](audit/PRE_AUDIT_REPORT.md)
  
  ---
  
+ ## ERC-8174: Intent Spec Support
+ 
+ Zawadi implements [ERC-8174 (Intent Spec for Contracts)](https://eips.ethereum.org/EIPS/eip-8174), a standard that attaches machine-readable semantic metadata to smart contracts. Both `Factory.sol` and `Escrow.sol` expose an `IIntentSpec` interface and support ERC-165 introspection.
+
+ ### Why Intent Spec?
+
+ A contract ABI tells external callers *what* functions exist, but not *what they mean*. ERC-8174 fills that gap by publishing a JSON manifest that describes, for every function, its **intent** (what it does in plain language), **preconditions** (what must be true before calling), **effects** (what state changes on success), **risks** (what could go wrong), and optional **agent guidance** (recommended usage patterns). This enables:
+
+ - **AI agents and automation** to interact with the protocol safely — they can verify preconditions and understand side-effects before submitting transactions.
+ - **Wallet UIs and block explorers** to display human-friendly function descriptions alongside raw calldata.
+ - **Auditors and integrators** to quickly understand contract semantics without reading Solidity source.
+
+ ### How it works
+
+ Each contract stores an IPFS URI pointing to its Intent Spec JSON manifest. The URI is set at deploy time via the constructor and can be updated by the contract owner/organizer. Every `Escrow` deployed by the `Factory` automatically inherits the Escrow Intent Spec URI.
+
+ - `getIntentSpecURI()` — returns the current manifest URI (ERC-8174).
+ - `supportsInterface(0x...)` — confirms ERC-165 + IIntentSpec support.
+ - `setIntentSpecURI(uri)` — allows the factory owner (Factory) or organizer (Escrow) to update the URI.
+
+ Intent Spec manifests are stored under `contract/intentspec/`:
+ - [`contract/intentspec/Factory.json`](contract/intentspec/Factory.json)
+ - [`contract/intentspec/Escrow.json`](contract/intentspec/Escrow.json)
+
+ ---
+
  ## Specifications and Interoperability
  
  To ensure cross-client compatibility and predictable integrations, metadata MUST strictly conform to the JSON specifications in the `specs/` folder. All producers and consumers of metadata are required to adhere to these field names, types, and casing. Deviations MAY lead to rejected uploads, failed parsing, or undefined behavior across clients and services.
