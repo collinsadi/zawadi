@@ -3,6 +3,8 @@ pragma solidity ^0.8.28;
 
 import {Escrow} from "../contracts/Zawadi/Escrow.sol";
 import {EscrowLib} from "../contracts/Libraries/EscrowLib.sol";
+import {IIntentSpec} from "../contracts/Interfaces/IIntentSpec.sol";
+import "../contracts/Errors/EscrowErrors.sol";
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -73,6 +75,9 @@ contract EscrowTest is Test {
     event ConfigurationLocked();
     event ConfigurationUnLocked();
     event SponsorWhitelisted(address sponsor);
+    event SponsorRevoked(address sponsor);
+    event PrizeClaimed(uint256 indexed challengeId, address winner, uint256 amount);
+    event ChallengeRefunded(uint256 indexed challengeId, address sponsor, uint256 amount);
 
     function setUp() public {
         organizer = makeAddr("organizer");
@@ -889,5 +894,496 @@ contract EscrowTest is Test {
         (uint256 position3, uint256 amount3, address winner3_, bool claimed3, uint256 challenge3) = escrow.allocations(winner3, 1);
         assertEq(amount3, 0.8 ether);
         assertEq(challenge3, 1);
+    }
+
+    // =========================================================================
+    // ERC-165 + IntentSpec
+    // =========================================================================
+
+    function test_SupportsInterface_ERC165() public view {
+        assertTrue(escrow.supportsInterface(0x01ffc9a7));
+    }
+
+    function test_SupportsInterface_IIntentSpec() public view {
+        assertTrue(escrow.supportsInterface(type(IIntentSpec).interfaceId));
+    }
+
+    function test_SupportsInterface_InvalidId() public view {
+        assertFalse(escrow.supportsInterface(0xffffffff));
+    }
+
+    function test_GetIntentSpecURI() public view {
+        assertEq(escrow.getIntentSpecURI(), "ipfs://escrow-test");
+    }
+
+    function test_SetIntentSpecURI_Success() public {
+        vm.prank(organizer);
+        escrow.setIntentSpecURI("ipfs://new-uri");
+        assertEq(escrow.getIntentSpecURI(), "ipfs://new-uri");
+    }
+
+    function test_SetIntentSpecURI_OnlyOrganizer() public {
+        vm.prank(sponsor1);
+        vm.expectRevert(Escrow__OnlyOrganizerCanAccess.selector);
+        escrow.setIntentSpecURI("ipfs://bad");
+    }
+
+    // =========================================================================
+    // revokeSponsor
+    // =========================================================================
+
+    function test_RevokeSponsor_Success() public {
+        vm.prank(organizer);
+        escrow.whitelistSponsor(sponsor1);
+        assertTrue(escrow.sponsors(sponsor1));
+
+        vm.prank(organizer);
+        vm.expectEmit(true, false, false, false);
+        emit SponsorRevoked(sponsor1);
+        escrow.revokeSponsor(sponsor1);
+
+        assertFalse(escrow.sponsors(sponsor1));
+        address[] memory list = escrow.getWhitelistedSponsors();
+        assertEq(list.length, 0);
+    }
+
+    function test_RevokeSponsor_MultipleSponsorsList() public {
+        vm.startPrank(organizer);
+        escrow.whitelistSponsor(sponsor1);
+        escrow.whitelistSponsor(sponsor2);
+        escrow.revokeSponsor(sponsor1);
+        vm.stopPrank();
+
+        address[] memory list = escrow.getWhitelistedSponsors();
+        assertEq(list.length, 1);
+        assertEq(list[0], sponsor2);
+    }
+
+    function test_RevokeSponsor_NotWhitelisted() public {
+        vm.prank(organizer);
+        vm.expectRevert(Escrow__SponsorNotWhitelisted.selector);
+        escrow.revokeSponsor(sponsor1);
+    }
+
+    function test_RevokeSponsor_OnlyOrganizer() public {
+        vm.prank(organizer);
+        escrow.whitelistSponsor(sponsor1);
+
+        vm.prank(sponsor1);
+        vm.expectRevert(Escrow__OnlyOrganizerCanAccess.selector);
+        escrow.revokeSponsor(sponsor1);
+    }
+
+    function test_RevokeSponsor_ContractLocked() public {
+        vm.prank(organizer);
+        escrow.whitelistSponsor(sponsor1);
+
+        vm.prank(organizer);
+        escrow.lockContract();
+
+        vm.prank(organizer);
+        vm.expectRevert(Escrow__ConfigurationLocked.selector);
+        escrow.revokeSponsor(sponsor1);
+    }
+
+    function test_RevokeSponsor_BlocksNewChallenges() public {
+        vm.startPrank(organizer);
+        escrow.whitelistSponsor(sponsor1);
+        escrow.revokeSponsor(sponsor1);
+        vm.stopPrank();
+
+        vm.prank(sponsor1);
+        vm.expectRevert(Escrow__SponsorNotWhitelisted.selector);
+        escrow.addChallenge(1000 * 10**18, address(mockToken), true, "QmTest");
+    }
+
+    // =========================================================================
+    // addWinners – duplicate detection & approval reset
+    // =========================================================================
+
+    function test_AddWinners_DuplicateWinner() public {
+        _setupFundedChallenge(1000 * 10**18, true);
+
+        address[] memory winners = new address[](2);
+        winners[0] = winner1;
+        winners[1] = winner1;
+
+        uint256[] memory allocs = new uint256[](2);
+        allocs[0] = 600 * 10**18;
+        allocs[1] = 400 * 10**18;
+
+        vm.prank(organizer);
+        vm.expectRevert(Escrow__DuplicateWinner.selector);
+        escrow.addWinners(0, winners, allocs);
+    }
+
+    function test_AddWinners_ResetsApprovals() public {
+        _setupFundedChallenge(1000 * 10**18, true);
+
+        address[] memory winners = new address[](1);
+        winners[0] = winner1;
+        uint256[] memory allocs = new uint256[](1);
+        allocs[0] = 1000 * 10**18;
+
+        vm.prank(organizer);
+        escrow.addWinners(0, winners, allocs);
+
+        vm.prank(sponsor1);
+        escrow.approveDistribution(0);
+        vm.prank(organizer);
+        escrow.approveDistribution(0);
+
+        (bool sBefore, bool oBefore) = escrow.approvals(0);
+        assertTrue(sBefore);
+        assertTrue(oBefore);
+
+        vm.prank(organizer);
+        escrow.unLockContract();
+
+        // Re-add winners (different set) – approvals must reset
+        address[] memory winners2 = new address[](1);
+        winners2[0] = winner2;
+        uint256[] memory allocs2 = new uint256[](1);
+        allocs2[0] = 1000 * 10**18;
+
+        vm.prank(organizer);
+        escrow.addWinners(0, winners2, allocs2);
+
+        (bool sAfter, bool oAfter) = escrow.approvals(0);
+        assertFalse(sAfter);
+        assertFalse(oAfter);
+    }
+
+    // =========================================================================
+    // claimPayout – ERC20
+    // =========================================================================
+
+    function test_ClaimPayout_ERC20_Success() public {
+        _setupFundedChallenge(1000 * 10**18, true);
+        _addWinnersAndApprove_ERC20();
+
+        uint256 balBefore = mockToken.balanceOf(winner1);
+
+        vm.prank(winner1);
+        vm.expectEmit(true, false, false, true);
+        emit PrizeClaimed(0, winner1, 600 * 10**18);
+        escrow.claimPayout(0);
+
+        uint256 balAfter = mockToken.balanceOf(winner1);
+        assertEq(balAfter - balBefore, 600 * 10**18);
+
+        (, , , bool claimed, ) = escrow.allocations(winner1, 0);
+        assertTrue(claimed);
+    }
+
+    function test_ClaimPayout_ETH_Success() public {
+        uint256 prize = 2 ether;
+        _setupFundedETHChallenge(prize);
+        _addWinnersAndApprove_ETH(prize);
+
+        uint256 balBefore = winner1.balance;
+
+        vm.prank(winner1);
+        escrow.claimPayout(0);
+
+        assertEq(winner1.balance - balBefore, 1.2 ether);
+    }
+
+    function test_ClaimPayout_NotWinner() public {
+        _setupFundedChallenge(1000 * 10**18, true);
+        _addWinnersAndApprove_ERC20();
+
+        vm.prank(nonSponsor);
+        vm.expectRevert(Escrow__UnauthorizedAccess.selector);
+        escrow.claimPayout(0);
+    }
+
+    function test_ClaimPayout_AlreadyClaimed() public {
+        _setupFundedChallenge(1000 * 10**18, true);
+        _addWinnersAndApprove_ERC20();
+
+        vm.prank(winner1);
+        escrow.claimPayout(0);
+
+        vm.prank(winner1);
+        vm.expectRevert(Escrow__PayoutAlreadyClaimed.selector);
+        escrow.claimPayout(0);
+    }
+
+    function test_ClaimPayout_NotApproved() public {
+        _setupFundedChallenge(1000 * 10**18, true);
+
+        address[] memory winners = new address[](1);
+        winners[0] = winner1;
+        uint256[] memory allocs = new uint256[](1);
+        allocs[0] = 1000 * 10**18;
+        vm.prank(organizer);
+        escrow.addWinners(0, winners, allocs);
+
+        vm.prank(winner1);
+        vm.expectRevert(Escrow__UnauthorizedAccess.selector);
+        escrow.claimPayout(0);
+    }
+
+    function test_ClaimPayout_OnlyOneSideApproved() public {
+        _setupFundedChallenge(1000 * 10**18, true);
+
+        address[] memory winners = new address[](1);
+        winners[0] = winner1;
+        uint256[] memory allocs = new uint256[](1);
+        allocs[0] = 1000 * 10**18;
+        vm.prank(organizer);
+        escrow.addWinners(0, winners, allocs);
+
+        vm.prank(sponsor1);
+        escrow.approveDistribution(0);
+
+        vm.prank(winner1);
+        vm.expectRevert(Escrow__UnauthorizedAccess.selector);
+        escrow.claimPayout(0);
+    }
+
+    function test_ClaimPayout_AllClaimed_SetsPaidOut() public {
+        _setupFundedChallenge(1000 * 10**18, true);
+        _addWinnersAndApprove_ERC20();
+
+        vm.prank(winner1);
+        escrow.claimPayout(0);
+
+        (, , bool isPaidOutBefore, , , , ) = escrow.challenges(0);
+        assertFalse(isPaidOutBefore);
+
+        vm.prank(winner2);
+        escrow.claimPayout(0);
+
+        (, , bool isPaidOutAfter, , , , ) = escrow.challenges(0);
+        assertTrue(isPaidOutAfter);
+        assertEq(escrow.claimedCount(0), 2);
+        assertEq(escrow.winnerCount(0), 2);
+    }
+
+    // =========================================================================
+    // refundChallenge
+    // =========================================================================
+
+    function test_RefundChallenge_ERC20_Success() public {
+        _setupFundedChallenge(1000 * 10**18, true);
+
+        uint256 balBefore = mockToken.balanceOf(sponsor1);
+
+        vm.prank(sponsor1);
+        vm.expectEmit(true, false, false, true);
+        emit ChallengeRefunded(0, sponsor1, 1000 * 10**18);
+        escrow.refundChallenge(0);
+
+        uint256 balAfter = mockToken.balanceOf(sponsor1);
+        assertEq(balAfter - balBefore, 1000 * 10**18);
+
+        (, , , , , , bool isFunded) = escrow.challenges(0);
+        assertFalse(isFunded);
+    }
+
+    function test_RefundChallenge_ETH_Success() public {
+        uint256 prize = 1 ether;
+        _setupFundedETHChallenge(prize);
+
+        uint256 balBefore = sponsor1.balance;
+
+        vm.prank(sponsor1);
+        escrow.refundChallenge(0);
+
+        assertEq(sponsor1.balance - balBefore, prize);
+
+        (, , , , , , bool isFunded) = escrow.challenges(0);
+        assertFalse(isFunded);
+    }
+
+    function test_RefundChallenge_NotSponsor() public {
+        _setupFundedChallenge(1000 * 10**18, true);
+
+        vm.prank(organizer);
+        vm.expectRevert(Escrow__OnlySponsorCanAccess.selector);
+        escrow.refundChallenge(0);
+    }
+
+    function test_RefundChallenge_NotFunded() public {
+        vm.prank(organizer);
+        escrow.whitelistSponsor(sponsor1);
+
+        vm.prank(sponsor1);
+        escrow.addChallenge(1000 * 10**18, address(mockToken), true, "QmTest");
+
+        vm.prank(sponsor1);
+        vm.expectRevert(Escrow__RefundWindowNotOpen.selector);
+        escrow.refundChallenge(0);
+    }
+
+    function test_RefundChallenge_BothApproved_Blocked() public {
+        _setupFundedChallenge(1000 * 10**18, true);
+
+        address[] memory winners = new address[](1);
+        winners[0] = winner1;
+        uint256[] memory allocs = new uint256[](1);
+        allocs[0] = 1000 * 10**18;
+        vm.prank(organizer);
+        escrow.addWinners(0, winners, allocs);
+
+        vm.prank(sponsor1);
+        escrow.approveDistribution(0);
+        vm.prank(organizer);
+        escrow.approveDistribution(0);
+
+        vm.prank(sponsor1);
+        vm.expectRevert(Escrow__RefundWindowNotOpen.selector);
+        escrow.refundChallenge(0);
+    }
+
+    function test_RefundChallenge_PartialApproval_Allowed() public {
+        _setupFundedChallenge(1000 * 10**18, true);
+
+        address[] memory winners = new address[](1);
+        winners[0] = winner1;
+        uint256[] memory allocs = new uint256[](1);
+        allocs[0] = 1000 * 10**18;
+        vm.prank(organizer);
+        escrow.addWinners(0, winners, allocs);
+
+        vm.prank(sponsor1);
+        escrow.approveDistribution(0);
+
+        vm.prank(sponsor1);
+        escrow.refundChallenge(0);
+
+        (, , , , , , bool isFunded) = escrow.challenges(0);
+        assertFalse(isFunded);
+
+        (bool sApproved, bool oApproved) = escrow.approvals(0);
+        assertFalse(sApproved);
+        assertFalse(oApproved);
+    }
+
+    function test_RefundChallenge_ResetsApprovals() public {
+        _setupFundedChallenge(1000 * 10**18, true);
+
+        address[] memory winners = new address[](1);
+        winners[0] = winner1;
+        uint256[] memory allocs = new uint256[](1);
+        allocs[0] = 1000 * 10**18;
+        vm.prank(organizer);
+        escrow.addWinners(0, winners, allocs);
+
+        vm.prank(organizer);
+        escrow.approveDistribution(0);
+
+        vm.prank(sponsor1);
+        escrow.refundChallenge(0);
+
+        (bool s, bool o) = escrow.approvals(0);
+        assertFalse(s);
+        assertFalse(o);
+    }
+
+    // =========================================================================
+    // getChallengesPage
+    // =========================================================================
+
+    function test_GetChallengesPage_Basic() public {
+        vm.prank(organizer);
+        escrow.whitelistSponsor(sponsor1);
+
+        vm.startPrank(sponsor1);
+        escrow.addChallenge(100, address(mockToken), true, "c0");
+        escrow.addChallenge(200, address(mockToken), true, "c1");
+        escrow.addChallenge(300, address(mockToken), true, "c2");
+        vm.stopPrank();
+
+        (EscrowLib.Challenge[] memory items, uint256[] memory ids) = escrow.getChallengesPage(0, 2);
+        assertEq(items.length, 2);
+        assertEq(ids[0], 0);
+        assertEq(ids[1], 1);
+        assertEq(items[0].totalPrize, 100);
+        assertEq(items[1].totalPrize, 200);
+    }
+
+    function test_GetChallengesPage_OffsetBeyondLength() public {
+        (EscrowLib.Challenge[] memory items, uint256[] memory ids) = escrow.getChallengesPage(10, 5);
+        assertEq(items.length, 0);
+        assertEq(ids.length, 0);
+    }
+
+    function test_GetChallengesPage_LimitExceedsRemaining() public {
+        vm.prank(organizer);
+        escrow.whitelistSponsor(sponsor1);
+
+        vm.prank(sponsor1);
+        escrow.addChallenge(100, address(mockToken), true, "c0");
+
+        (EscrowLib.Challenge[] memory items, uint256[] memory ids) = escrow.getChallengesPage(0, 100);
+        assertEq(items.length, 1);
+        assertEq(ids[0], 0);
+    }
+
+    // =========================================================================
+    // Internal helpers
+    // =========================================================================
+
+    function _setupFundedChallenge(uint256 prize, bool isERC20) internal {
+        vm.prank(organizer);
+        escrow.whitelistSponsor(sponsor1);
+
+        vm.prank(sponsor1);
+        escrow.addChallenge(prize, address(mockToken), isERC20, "QmTest");
+
+        mockToken.transfer(sponsor1, prize);
+        vm.prank(sponsor1);
+        mockToken.approve(address(escrow), prize);
+        vm.prank(sponsor1);
+        escrow.fundChallenge(0);
+    }
+
+    function _setupFundedETHChallenge(uint256 prize) internal {
+        vm.prank(organizer);
+        escrow.whitelistSponsor(sponsor1);
+
+        vm.prank(sponsor1);
+        escrow.addChallenge(prize, address(0), false, "QmTestETH");
+
+        vm.deal(sponsor1, prize);
+        vm.prank(sponsor1);
+        escrow.fundChallenge{value: prize}(0);
+    }
+
+    function _addWinnersAndApprove_ERC20() internal {
+        address[] memory winners = new address[](2);
+        winners[0] = winner1;
+        winners[1] = winner2;
+        uint256[] memory allocs = new uint256[](2);
+        allocs[0] = 600 * 10**18;
+        allocs[1] = 400 * 10**18;
+
+        vm.prank(organizer);
+        escrow.addWinners(0, winners, allocs);
+
+        vm.prank(sponsor1);
+        escrow.approveDistribution(0);
+        vm.prank(organizer);
+        escrow.approveDistribution(0);
+    }
+
+    function _addWinnersAndApprove_ETH(uint256 prize) internal {
+        address[] memory winners = new address[](2);
+        winners[0] = winner1;
+        winners[1] = winner2;
+        uint256[] memory allocs = new uint256[](2);
+        allocs[0] = (prize * 60) / 100;
+        allocs[1] = prize - allocs[0];
+
+        vm.prank(organizer);
+        escrow.addWinners(0, winners, allocs);
+
+        vm.prank(sponsor1);
+        escrow.approveDistribution(0);
+        vm.prank(organizer);
+        escrow.approveDistribution(0);
     }
 }

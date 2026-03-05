@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import {Factory} from "../contracts/Zawadi/Factory.sol";
 import {FactoryLib} from "../contracts/Libraries/FactoryLib.sol";
+import {IIntentSpec} from "../contracts/Interfaces/IIntentSpec.sol";
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 
@@ -312,5 +313,36 @@ contract FactoryTest is Test {
         FactoryLib.Hackathon[] memory allHackathons = factory
             .getAllHackathons();
         assertEq(allHackathons.length, 0);
+    }
+
+    // =========================================================================
+    // ERC-165 + IntentSpec
+    // =========================================================================
+
+    function test_SupportsInterface_ERC165() public view {
+        assertTrue(factory.supportsInterface(0x01ffc9a7));
+    }
+
+    function test_SupportsInterface_IIntentSpec() public view {
+        assertTrue(factory.supportsInterface(type(IIntentSpec).interfaceId));
+    }
+
+    function test_SupportsInterface_InvalidId() public view {
+        assertFalse(factory.supportsInterface(0xffffffff));
+    }
+
+    function test_GetIntentSpecURI() public view {
+        assertEq(factory.getIntentSpecURI(), "ipfs://factory-test");
+    }
+
+    function test_SetIntentSpecURI_Success() public {
+        factory.setIntentSpecURI("ipfs://updated-factory");
+        assertEq(factory.getIntentSpecURI(), "ipfs://updated-factory");
+    }
+
+    function test_SetIntentSpecURI_OnlyOwner() public {
+        vm.prank(user1);
+        vm.expectRevert();
+        factory.setIntentSpecURI("ipfs://bad");
     }
 }
