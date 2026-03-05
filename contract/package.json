@@ -7,7 +7,8 @@
     "compile": "hardhat compile",
     "node": "hardhat node",
     "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
-    "ignition:local": "hardhat ignition deploy ignition/modules/Factory.ts --network sepolia --verify",
+    "ignition:local": "hardhat ignition deploy ignition/modules/Factory.ts --network localhost",
+    "deploy:sepolia": "hardhat ignition deploy ignition/modules/Factory.ts --network sepolia --verify",
     "dev:info": "hardhat run scripts/local-dev.ts",
     "clean": "hardhat clean"
   },

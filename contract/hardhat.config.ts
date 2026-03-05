@@ -34,8 +34,8 @@ const config: HardhatUserConfig = {
     sepolia: {
       type: "http",
       chainType: "l1",
-       url: ``,
-      accounts: [""],
+      url: configVariable("SEPOLIA_RPC_URL"),
+      accounts: [configVariable("SEPOLIA_PRIVATE_KEY")],
     },
 
     hardhat: {
@@ -64,7 +64,7 @@ const config: HardhatUserConfig = {
 
   verify: {
     etherscan: {
-      apiKey: "",
+      apiKey: configVariable("ETHERSCAN_API_KEY"),
     },
   },
 
