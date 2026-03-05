@@ -1,0 +1,269 @@
+{
+  "contract": {
+    "name": "Escrow",
+    "version": "2.0",
+    "description": "Hackathon escrow contract that holds prize funds (ERC20 or native ETH), enforces dual-approval from organizer and sponsor, and allows winners to self-claim payouts."
+  },
+  "functions": [
+    {
+      "name": "setIntentSpecURI",
+      "intent": "Sets the machine-readable semantic metadata URI for this contract.",
+      "preconditions": [
+        "Caller must be the organizer."
+      ],
+      "effects": [
+        "Updates the intentSpecURI storage variable."
+      ],
+      "risks": [
+        "URI should reference immutable content; a mutable URI may mislead agents."
+      ],
+      "signature": "0x9c7b3a2e"
+    },
+    {
+      "name": "whitelistSponsor",
+      "intent": "Grants a sponsor address permission to create and fund challenges in this escrow.",
+      "preconditions": [
+        "Caller must be the organizer.",
+        "Sponsor must not already be whitelisted."
+      ],
+      "effects": [
+        "Sponsor address is added to the whitelist; emits SponsorWhitelisted."
+      ],
+      "risks": [
+        "No on-chain identity verification of the sponsor address."
+      ],
+      "signature": "0x555a424f"
+    },
+    {
+      "name": "revokeSponsor",
+      "intent": "Removes a sponsor from the whitelist, preventing them from creating new challenges.",
+      "preconditions": [
+        "Caller must be the organizer.",
+        "Contract must not be locked.",
+        "Sponsor must currently be whitelisted."
+      ],
+      "effects": [
+        "Sponsor is removed from the whitelist; emits SponsorRevoked."
+      ],
+      "agentGuidance": "Existing challenges by this sponsor remain valid; only new challenge creation is blocked.",
+      "signature": "0xb6fb2991"
+    },
+    {
+      "name": "getWhitelistedSponsors",
+      "intent": "Retrieves all currently whitelisted sponsor addresses.",
+      "effects": [
+        "None (read-only)."
+      ],
+      "signature": "0x34084175"
+    },
+    {
+      "name": "addChallenge",
+      "intent": "Creates a new prize challenge with the specified prize pool, token, and metadata.",
+      "preconditions": [
+        "Caller must be a whitelisted sponsor.",
+        "Contract must not be locked.",
+        "Total prize must be greater than zero."
+      ],
+      "effects": [
+        "A new challenge is stored; challengeCount is incremented; emits ChallengeAdded."
+      ],
+      "risks": [
+        "The challenge is created unfunded; sponsor must call fundChallenge separately."
+      ],
+      "agentGuidance": "Verify the token address is a legitimate ERC20 contract when isERC20 is true.",
+      "signature": "0x85910730"
+    },
+    {
+      "name": "getChallengeIds",
+      "intent": "Returns the full array of challenge IDs for enumeration.",
+      "effects": [
+        "None (read-only)."
+      ],
+      "risks": [
+        "May be gas-heavy for very large challenge counts; prefer getChallengesPage."
+      ],
+      "signature": "0x48696151"
+    },
+    {
+      "name": "getChallengesPage",
+      "intent": "Returns a paginated slice of challenges for efficient enumeration.",
+      "effects": [
+        "None (read-only)."
+      ],
+      "signature": "0xded7024d"
+    },
+    {
+      "name": "fundChallenge",
+      "intent": "Transfers the full prize amount (ERC20 or native ETH) from the sponsor into escrow.",
+      "preconditions": [
+        "Caller must be the challenge sponsor.",
+        "Contract must not be locked.",
+        "Challenge must exist and not already be funded.",
+        "For ERC20: sponsor must have approved the escrow for at least totalPrize tokens.",
+        "For native ETH: msg.value must exactly equal totalPrize."
+      ],
+      "effects": [
+        "Tokens/ETH are transferred to the escrow; challenge.isFunded is set to true; emits ChallengeFunded."
+      ],
+      "risks": [
+        "Irreversible deposit unless refundChallenge is used before dual approval completes."
+      ],
+      "agentGuidance": "For ERC20, call approve on the token contract before calling fundChallenge.",
+      "signature": "0x6889f0a4"
+    },
+    {
+      "name": "getChallenge",
+      "intent": "Retrieves all stored data for a specific challenge.",
+      "effects": [
+        "None (read-only)."
+      ],
+      "signature": "0x1bdd4b74"
+    },
+    {
+      "name": "challengeTokenDecimals",
+      "intent": "Returns the decimal precision of the prize token for display purposes.",
+      "effects": [
+        "None (read-only)."
+      ],
+      "signature": "0x6300acbd"
+    },
+    {
+      "name": "lockContract",
+      "intent": "Locks the escrow to prevent further configuration changes (challenges, winners, funding).",
+      "preconditions": [
+        "Caller must be the organizer.",
+        "Contract must not already be locked."
+      ],
+      "effects": [
+        "isLocked is set to true; emits ConfigurationLocked."
+      ],
+      "risks": [
+        "Approvals and claims remain available after lock; only configuration is frozen."
+      ],
+      "signature": "0x753868e3"
+    },
+    {
+      "name": "addWinners",
+      "intent": "Assigns prize allocations to winner addresses for a funded challenge. Resets prior approvals.",
+      "preconditions": [
+        "Caller must be the organizer.",
+        "Contract must not be locked.",
+        "Challenge must exist and be funded.",
+        "Winners and allocations arrays must be non-empty, equal length, no zero addresses or amounts, no duplicates.",
+        "Sum of allocations must exactly equal totalPrize."
+      ],
+      "effects": [
+        "Allocations are written; approvals are reset to false; winnerCount is set; emits WinnersAdded."
+      ],
+      "risks": [
+        "Calling addWinners again overwrites previous allocations and resets approvals. Sponsor must re-approve."
+      ],
+      "agentGuidance": "Verify allocations sum to totalPrize off-chain before submitting.",
+      "signature": "0xb83e97b3"
+    },
+    {
+      "name": "approveDistribution",
+      "intent": "Records an approval from either the sponsor or the organizer for prize distribution.",
+      "preconditions": [
+        "Caller must be the challenge sponsor or the organizer.",
+        "Caller must not have already approved."
+      ],
+      "effects": [
+        "Sets sponsorApproved or organiserApproved to true; emits DistributionApproved."
+      ],
+      "agentGuidance": "Both approvals are required before any winner can claimPayout.",
+      "signature": "0xc0349178"
+    },
+    {
+      "name": "claimPayout",
+      "intent": "Transfers the caller's allocated prize (ERC20 or ETH) after both approvals are confirmed.",
+      "preconditions": [
+        "Caller must be an assigned winner for this challenge.",
+        "Caller must not have already claimed.",
+        "Both sponsor and organizer must have approved distribution."
+      ],
+      "effects": [
+        "Allocation is marked claimed; funds are transferred; claimedCount incremented; isPaidOut set if all claimed; emits PrizeClaimed."
+      ],
+      "risks": [
+        "Irreversible transfer of funds to the caller."
+      ],
+      "agentGuidance": "Check approvals(challengeId) before calling to avoid a revert.",
+      "signature": "0x8a69614e"
+    },
+    {
+      "name": "refundChallenge",
+      "intent": "Returns deposited funds to the sponsor when dual approval is not yet complete.",
+      "preconditions": [
+        "Caller must be the challenge sponsor.",
+        "Challenge must be funded and not fully paid out.",
+        "Dual approval must NOT be complete (at least one party has not approved)."
+      ],
+      "effects": [
+        "Challenge is marked unfunded; approvals are reset; funds returned to sponsor; emits ChallengeRefunded."
+      ],
+      "risks": [
+        "Irreversible; challenge must be re-funded to proceed with payouts."
+      ],
+      "signature": "0x21f50ba5"
+    },
+    {
+      "name": "unLockContract",
+      "intent": "Unlocks the escrow to allow configuration changes again.",
+      "preconditions": [
+        "Caller must be the organizer."
+      ],
+      "effects": [
+        "isLocked is set to false; emits ConfigurationUnLocked."
+      ],
+      "signature": "0xb6ea5e74"
+    }
+  ],
+  "events": [
+    {
+      "name": "SponsorWhitelisted",
+      "description": "Organizer added a sponsor to the whitelist."
+    },
+    {
+      "name": "SponsorRevoked",
+      "description": "Organizer removed a sponsor from the whitelist."
+    },
+    {
+      "name": "ChallengeAdded",
+      "description": "A new prize challenge was created by a whitelisted sponsor."
+    },
+    {
+      "name": "ChallengeFunded",
+      "description": "Sponsor deposited ERC20 tokens or native ETH to fund a challenge."
+    },
+    {
+      "name": "WinnersAdded",
+      "description": "Organizer assigned winner addresses and prize allocations to a challenge."
+    },
+    {
+      "name": "DistributionApproved",
+      "description": "Sponsor or organizer approved the distribution for a challenge."
+    },
+    {
+      "name": "PrizeClaimed",
+      "description": "A winner withdrew their allocated prize."
+    },
+    {
+      "name": "ChallengeRefunded",
+      "description": "Sponsor reclaimed funds from an unapproved challenge."
+    },
+    {
+      "name": "ConfigurationLocked",
+      "description": "Organizer locked the escrow preventing further configuration changes."
+    },
+    {
+      "name": "ConfigurationUnLocked",
+      "description": "Organizer unlocked the escrow allowing configuration changes."
+    }
+  ],
+  "invariants": [
+    "Total claimable allocations for a challenge always equal the challenge totalPrize.",
+    "Funds can only leave the contract through claimPayout (to winners) or refundChallenge (to sponsor).",
+    "A payout requires both sponsor and organizer approval."
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "contract": {
+    "name": "Factory",
+    "version": "2.0",
+    "description": "Factory that deploys per-hackathon Escrow contracts, indexes them by bytes32 ID, and manages factory-level ownership."
+  },
+  "functions": [
+    {
+      "name": "setIntentSpecURI",
+      "intent": "Sets the machine-readable semantic metadata URI for this contract.",
+      "preconditions": [
+        "Caller must be the factory owner."
+      ],
+      "effects": [
+        "Updates the intentSpecURI storage variable."
+      ],
+      "risks": [
+        "URI should reference immutable content; a mutable URI may mislead agents."
+      ],
+      "signature": "0x9c7b3a2e"
+    },
+    {
+      "name": "createHackathon",
+      "intent": "Creates a new hackathon entry, deploys a dedicated Escrow contract, and returns both the hackathon ID and the escrow address.",
+      "preconditions": [
+        "_ipfsCid should be a valid IPFS CID pointing to hackathon metadata."
+      ],
+      "effects": [
+        "A new Escrow contract is deployed; hackathon is stored in mapping and array; emits HackathonCreated."
+      ],
+      "risks": [
+        "The caller becomes the organizer of the deployed Escrow; this is irreversible."
+      ],
+      "agentGuidance": "Pin hackathon metadata to IPFS before calling. The returned escrowContract address is needed for all subsequent challenge operations.",
+      "signature": "0x3163f04e"
+    },
+    {
+      "name": "getHackathonById",
+      "intent": "Looks up a hackathon by its bytes32 ID and returns its metadata, escrow address, and organizer.",
+      "effects": [
+        "None (read-only)."
+      ],
+      "agentGuidance": "Reverts if the hackathon does not exist. Check getHackathonCount first if unsure.",
+      "signature": "0xcc25cacc"
+    },
+    {
+      "name": "getAllHackathons",
+      "intent": "Returns the complete list of all hackathons for enumeration.",
+      "effects": [
+        "None (read-only)."
+      ],
+      "risks": [
+        "May be gas-heavy for very large hackathon counts when called on-chain."
+      ],
+      "signature": "0x7bda0872"
+    },
+    {
+      "name": "getHackathonCount",
+      "intent": "Returns the number of hackathons created through this factory.",
+      "effects": [
+        "None (read-only)."
+      ],
+      "signature": "0xda7bafce"
+    },
+    {
+      "name": "transferOwnership",
+      "intent": "Transfers the factory owner role to a new address.",
+      "preconditions": [
+        "Caller must be the current factory owner.",
+        "New owner must not be the zero address."
+      ],
+      "effects": [
+        "factoryOwner is updated; emits OwnershipTransferred."
+      ],
+      "risks": [
+        "Irreversible. The previous owner loses all factory-level privileges."
+      ],
+      "agentGuidance": "Double-check the new owner address; there is no confirmation step.",
+      "signature": "0xf2fde38b"
+    }
+  ],
+  "events": [
+    {
+      "name": "HackathonCreated",
+      "description": "A new hackathon was created and its Escrow contract deployed."
+    },
+    {
+      "name": "OwnershipTransferred",
+      "description": "Factory ownership was transferred to a new address."
+    }
+  ],
+  "invariants": [
+    "Each hackathon ID is unique; duplicate IDs are rejected.",
+    "The factory never holds user funds; all funds go to deployed Escrow instances."
+  ]
+}
