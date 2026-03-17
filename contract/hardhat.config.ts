@@ -31,9 +31,17 @@ const config: HardhatUserConfig = {
       type: "edr-simulated",
       chainType: "op",
     },
+    optimism: {
+      type: "http",
+      chainType: "op",
+      chainId: 10,
+      url: configVariable("OPTIMISM_RPC_URL"),
+      accounts: [configVariable("OPTIMISM_PRIVATE_KEY")],
+    },
     sepolia: {
       type: "http",
       chainType: "l1",
+      chainId: 11155111,
       url: configVariable("SEPOLIA_RPC_URL"),
       accounts: [configVariable("SEPOLIA_PRIVATE_KEY")],
     },
