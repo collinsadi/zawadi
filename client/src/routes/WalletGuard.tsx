@@ -2,7 +2,8 @@ import type { PropsWithChildren } from "react";
 import { useAccount, useChainId, useSwitchChain } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 
-const SUPPORTED_CHAIN_IDS = [10, 11155111] as const;
+const SUPPORTED_CHAIN_IDS = [10] as const;
+// const SUPPORTED_CHAIN_IDS = [10, 11155111] as const;
 
 export default function WalletGuard({ children }: PropsWithChildren) {
   const { isConnected } = useAccount();
@@ -31,8 +32,7 @@ export default function WalletGuard({ children }: PropsWithChildren) {
         <h1 className="text-2xl font-semibold mb-4">Wrong network</h1>
         <p className="text-slate-600 dark:text-slate-300 mb-6">
           You’re connected to an unsupported network. Please switch to{" "}
-          <span className="font-semibold">Optimism Mainnet</span> or{" "}
-          <span className="font-semibold">Sepolia</span>.
+          <span className="font-semibold">Optimism Mainnet</span>.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <button
@@ -43,6 +43,7 @@ export default function WalletGuard({ children }: PropsWithChildren) {
           >
             Switch to Optimism
           </button>
+          {/*
           <button
             type="button"
             disabled={isPending}
@@ -51,6 +52,7 @@ export default function WalletGuard({ children }: PropsWithChildren) {
           >
             Switch to Sepolia
           </button>
+          */}
         </div>
       </div>
     );
