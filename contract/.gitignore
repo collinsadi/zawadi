@@ -19,5 +19,10 @@
 # Hardhat coverage reports
 /coverage
 
+# Hardhat Ignition deployment artifacts (keep deployed address records)
+/ignition/deployments/**/artifacts
+/ignition/deployments/**/build-info
+/ignition/deployments/**/journal.jsonl
+
 # environment variables
 .env
