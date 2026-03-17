@@ -1,15 +1,15 @@
 # Zawadi: Decentralized Hackathon Escrow Protocol
 
  Version: 1.0  
- Last updated: 2025-09-26
+ Last updated: 2026-03-17
 
  Demo Video : https://youtu.be/QRYhTMeOOPk
  
- On Sepolia Etherscan: https://sepolia.etherscan.io/address/0x285e9868d6CeA82295b50BaA2516a151900C51ea#code
+ New Audited Contract on Sepolia: https://sepolia.etherscan.io/address/0xBdE4dE795F53b0c5c3CFde78cF3aC104D016C2e1#code
  
- New Audited Contract on Etherscan: https://sepolia.etherscan.io/address/0xBdE4dE795F53b0c5c3CFde78cF3aC104D016C2e1#code
+ New Audited Contract on Optimism Mainnet: https://optimistic.etherscan.io/address/0x5368CB8C5ec254De208ceeB455Caba6E12064a0F#code
 
- Basic Security Audit Report: [audit/AUDIT_REPORT.md](audit/AUDIT_REPORT.md)
+Security Audit Report: [audit/AUDIT_REPORT.md](audit/AUDIT_REPORT.md)
 
  ## Table of Contents
  - [Abstract](#abstract)
@@ -283,11 +283,9 @@ Path: `contract/contracts/Zawadi/Escrow.sol`
 
 ## Security
 
-This project has undergone a pre-audit security assessment and a basic security audit.
-A full third-party audit is planned prior to mainnet deployment.
+This project has undergone an automated security audit.
 
-- Pre-Audit Assessment: [audit/PRE_AUDIT_REPORT.md](audit/PRE_AUDIT_REPORT.md)
-- Basic Security Audit: [audit/AUDIT_REPORT.md](audit/AUDIT_REPORT.md)
+- Automated Security Audit: [audit/AUDIT_REPORT.md](audit/AUDIT_REPORT.md)
 
 ---
 

@@ -1,11 +1,11 @@
-# Basic Security Audit Report — Zawadi Protocol
+# Security Audit Report — Zawadi Protocol
 
 | Field | Detail |
 |---|---|
 | **Project** | Zawadi — Decentralized Hackathon Escrow Protocol |
 | **Language** | Solidity 0.8.28 |
 | **Framework** | Hardhat / Foundry (Forge tests) |
-| **Audit Type** | Basic Manual Audit |
+| **Audit Type** | Automated AI Audit |
 | **Date** | 2026-03-05 |
 | **Auditor** | Automated AI Audit Tool |
 | **Commit Scope** | All contracts under `contract/contracts/` |
@@ -34,7 +34,7 @@
 
 ## 1. Executive Summary
 
-This report presents the findings of a basic security audit performed on the Zawadi Protocol smart contracts. Zawadi is a decentralized hackathon escrow system that allows organizers to create hackathons, whitelist sponsors, manage prize challenges (ERC20 and native ETH), define winner allocations, enforce dual-approval flows, and enable self-service winner payouts.
+This report presents the findings of a security audit performed on the Zawadi Protocol smart contracts. Zawadi is a decentralized hackathon escrow system that allows organizers to create hackathons, whitelist sponsors, manage prize challenges (ERC20 and native ETH), define winner allocations, enforce dual-approval flows, and enable self-service winner payouts.
 
 The audit reviewed **8 Solidity source files** across core contracts, libraries, events, and error definitions. The review identified **1 critical**, **3 high**, **4 medium**, **4 low**, and **4 informational** findings.
 
@@ -599,7 +599,7 @@ The following scenarios, previously untested, now have dedicated test coverage (
 
 ## 10. Disclaimer
 
-This report represents a basic security review of the Zawadi Protocol smart contracts performed using an automated AI-powered audit tool. **It is not a substitute for a comprehensive professional third-party audit.** The review was conducted at a point in time against the source code as provided and does not guarantee the absence of vulnerabilities. No formal verification, fuzzing, or symbolic execution was performed.
+This report represents a security review of the Zawadi Protocol smart contracts performed using an automated AI-powered audit tool. **It is not a substitute for a comprehensive professional third-party audit.** The review was conducted at a point in time against the source code as provided and does not guarantee the absence of vulnerabilities. No formal verification, fuzzing, or symbolic execution was performed.
 
 All Critical, High, Medium, and Low findings identified in this review have been remediated in the contract source code, and 37 new tests were added to validate the fixes (91 total passing tests). Informational findings were acknowledged and left as-is.
 

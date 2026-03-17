@@ -1,5 +1,5 @@
 import type { Address, Hex } from 'viem';
-import { readContract, simulateContract, waitForTransactionReceipt, writeContract } from 'wagmi/actions';
+import { getChainId, readContract, simulateContract, waitForTransactionReceipt, writeContract } from 'wagmi/actions';
 import { config } from '../config/wagmi';
 import factoryAbi from '../abi/factory.json';
 
@@ -13,9 +13,26 @@ export type Hackathon = {
 
 // Env helper
 const getFactoryAddress = (): Address => {
-  const addr = import.meta.env.VITE_FACTORY_ADDRESS as Address | undefined;
+  const chainId = getChainId(config);
+  const optimismAddr = import.meta.env.VITE_FACTORY_ADDRESS_OPTIMISM as Address | undefined;
+  const sepoliaAddr = import.meta.env.VITE_FACTORY_ADDRESS_SEPOLIA as Address | undefined;
+  const legacyAddr = import.meta.env.VITE_FACTORY_ADDRESS as Address | undefined;
+
+  const addr =
+    chainId === 10
+      ? (optimismAddr ?? legacyAddr)
+      : chainId === 11155111
+        ? (sepoliaAddr ?? legacyAddr)
+        : legacyAddr;
+
   if (!addr) {
-    throw new Error('VITE_FACTORY_ADDRESS is not set in the environment');
+    throw new Error(
+      chainId === 10
+        ? 'VITE_FACTORY_ADDRESS_OPTIMISM (or VITE_FACTORY_ADDRESS) is not set in the environment'
+        : chainId === 11155111
+          ? 'VITE_FACTORY_ADDRESS_SEPOLIA (or VITE_FACTORY_ADDRESS) is not set in the environment'
+          : 'VITE_FACTORY_ADDRESS is not set in the environment'
+    );
   }
   return addr;
 };
@@ -84,5 +101,12 @@ export async function transferOwnership(newOwner: Address) {
 
 // Utility to read from public state if needed directly
 export function getFactoryAddressUnsafe(): Address | undefined {
+  const chainId = getChainId(config);
+  if (chainId === 10) {
+    return (import.meta.env.VITE_FACTORY_ADDRESS_OPTIMISM as Address | undefined) ?? (import.meta.env.VITE_FACTORY_ADDRESS as Address | undefined);
+  }
+  if (chainId === 11155111) {
+    return (import.meta.env.VITE_FACTORY_ADDRESS_SEPOLIA as Address | undefined) ?? (import.meta.env.VITE_FACTORY_ADDRESS as Address | undefined);
+  }
   return import.meta.env.VITE_FACTORY_ADDRESS as Address | undefined;
 }
