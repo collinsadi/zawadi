@@ -9,6 +9,7 @@
     "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
     "ignition:local": "hardhat ignition deploy ignition/modules/Factory.ts --network localhost",
     "deploy:sepolia": "hardhat ignition deploy ignition/modules/Factory.ts --network sepolia --verify",
+    "deploy:optimism": "hardhat ignition deploy ignition/modules/Factory.ts --network optimism --verify",
     "dev:info": "hardhat run scripts/local-dev.ts",
     "clean": "hardhat clean"
   },
