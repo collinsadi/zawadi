@@ -73,6 +73,30 @@ export default function ChallengeDetails() {
     return () => { cancelled = true; };
   }, [id, challengeId]);
 
+  // Keep approvals up-to-date in case they change on another screen
+  // (e.g. organizer approves distribution from the Manage view).
+  useEffect(() => {
+    if (!escrow || !challengeId) return;
+    const escrowInstance = escrow;
+    let cancelled = false;
+    async function refreshApprovals() {
+      try {
+        const cid = BigInt(Number(challengeId));
+        const a = await escrowInstance.approvals(cid);
+        if (!cancelled) setApprovals(a);
+      } catch {
+        // ignore transient RPC errors
+      }
+    }
+
+    refreshApprovals();
+    const interval = setInterval(refreshApprovals, 10_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [escrow, challengeId]);
+
 
   const title = ipfs?.title || (challengeId ? `Challenge #${challengeId}` : "Challenge");
   const cover = ipfs?.data?.image || "";
@@ -93,6 +117,8 @@ export default function ChallengeDetails() {
   const approvalsRemaining = Math.max(0, approvalsRequired - approvalsCompleted);
   const approvalsRemainingDisplay = approvals ? String(approvalsRemaining) : "—";
   const approvalsBoth = !!approvals?.organiserApproved && !!approvals?.sponsorApproved;
+  const sponsorApproved = !!approvals?.sponsorApproved;
+  const showWinnersBadge = hasW || sponsorApproved;
 
   // Determine if connected user is a winner and claim status
   const isMeWinner = useMemo(() => {
@@ -198,9 +224,9 @@ export default function ChallengeDetails() {
                 </span>
                 <span className={
                   "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium " +
-                  (hasW ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-700")
+                  (showWinnersBadge ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-700")
                 }>
-                  {hasW ? "Winners announced" : "No winners yet"}
+                  {showWinnersBadge ? "Winners announced" : "No winners yet"}
                 </span>
                 {!isFunded && isSponsor && (
                   <button
@@ -249,8 +275,8 @@ export default function ChallengeDetails() {
               </span>
             </div>
 
-            {/* Sponsor approve button (only when funded, winners exist, and sponsor not yet approved) */}
-            {isFunded && isSponsor && hasW && !approvals?.sponsorApproved && (
+            {/* Sponsor approve button (only after organizer approval; and sponsor not yet approved) */}
+            {isFunded && isSponsor && !!approvals?.organiserApproved && !approvals?.sponsorApproved && (
               <div className="mt-3">
                 <button
                   className="rounded-lg bg-primary-600 text-white px-3 py-1.5 text-xs disabled:opacity-60"
